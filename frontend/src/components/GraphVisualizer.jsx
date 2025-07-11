@@ -12,6 +12,7 @@ export default function GraphVisualizer() {
   const [deleteEdgeFrom, setDeleteEdgeFrom] = useState('');
   const [deleteEdgeTo, setDeleteEdgeTo] = useState('');
   const [deleteNodeId, setDeleteNodeId] = useState('');
+  const [bulkNodeCount, setBulkNodeCount] = useState('');
   const [draggedNode, setDraggedNode] = useState(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
@@ -19,15 +20,14 @@ export default function GraphVisualizer() {
   const height = 500;
 
   const addNode = () => {
-    const id = nodes.length + 1;
+    const id = nodes.length > 0 ? Math.max(...nodes.map(n => n.id)) + 1 : 1;
     const nodeRadius = 25;
-    const minDistance = nodeRadius * 2 + 10; // Minimum distance between node centers
+    const minDistance = nodeRadius * 2 + 10;
     
     let x, y;
     let attempts = 0;
     const maxAttempts = 100;
     
-    // Try to find a position that doesn't overlap with existing nodes
     do {
       x = Math.random() * (width - 80) + 40;
       y = Math.random() * (height - 80) + 40;
@@ -38,6 +38,41 @@ export default function GraphVisualizer() {
     }));
     
     setNodes([...nodes, { id, x, y }]);
+  };
+
+  const addBulkNodes = () => {
+    const count = parseInt(bulkNodeCount);
+    if (isNaN(count) || count <= 0 || count > 50) {
+      alert('Please enter a valid number between 1 and 50');
+      return;
+    }
+
+    const newNodes = [];
+    const nodeRadius = 25;
+    const minDistance = nodeRadius * 2 + 10;
+    const startId = nodes.length > 0 ? Math.max(...nodes.map(n => n.id)) + 1 : 1;
+    const allExistingNodes = [...nodes];
+
+    for (let i = 0; i < count; i++) {
+      const id = startId + i;
+      let x, y;
+      let attempts = 0;
+      const maxAttempts = 200;
+      
+      do {
+        x = Math.random() * (width - 80) + 40;
+        y = Math.random() * (height - 80) + 40;
+        attempts++;
+      } while (attempts < maxAttempts && [...allExistingNodes, ...newNodes].some(node => {
+        const distance = Math.sqrt(Math.pow(x - node.x, 2) + Math.pow(y - node.y, 2));
+        return distance < minDistance;
+      }));
+      
+      newNodes.push({ id, x, y });
+    }
+
+    setNodes([...nodes, ...newNodes]);
+    setBulkNodeCount('');
   };
 
   const deleteNode = () => {
@@ -53,7 +88,6 @@ export default function GraphVisualizer() {
     const toId = parseInt(addEdgeTo);
     if (isNaN(fromId) || isNaN(toId) || fromId === toId) return;
     
-    // Check if edge already exists
     const edgeExists = edges.some(e => 
       (e.from === fromId && e.to === toId) || (e.from === toId && e.to === fromId)
     );
@@ -82,7 +116,6 @@ export default function GraphVisualizer() {
     const startId = parseInt(start);
     const endId = parseInt(end);
     
-    // Check if start and end nodes exist
     const startNode = nodes.find(n => n.id === startId);
     const endNode = nodes.find(n => n.id === endId);
     
@@ -91,12 +124,10 @@ export default function GraphVisualizer() {
       return;
     }
     
-    // Build adjacency list
     const adj = {};
     nodes.forEach(n => { adj[n.id] = []; });
     
     edges.forEach(({ from, to }) => {
-      // Only add edges if both nodes exist
       if (adj[from] && adj[to]) {
         adj[from].push(to);
         adj[to].push(from);
@@ -118,6 +149,7 @@ export default function GraphVisualizer() {
     setDeleteEdgeFrom('');
     setDeleteEdgeTo('');
     setDeleteNodeId('');
+    setBulkNodeCount('');
     setDraggedNode(null);
   };
 
@@ -163,7 +195,7 @@ export default function GraphVisualizer() {
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-gray-800 mb-2">Graph Theory Visualizer</h1>
-          <p className="text-gray-600">Interactive shortest path finder using BFS algorithm</p>
+          <p className="text-gray-600">Interactive Graph Theory Visualizer with Bulk Node Addition</p>
         </div>
 
         {/* Control Panel */}
@@ -173,19 +205,49 @@ export default function GraphVisualizer() {
             {/* Node Operations */}
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-gray-800 border-b border-gray-300 pb-2">Node Operations</h3>
+              
+              {/* Single Node */}
               <button 
                 onClick={addNode}
-                className="w-full bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
+                className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
               >
-                Add Node
+                Add Single Node
               </button>
+
+              {/* Bulk Nodes */}
               <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Add Multiple Nodes</label>
+                <input 
+                  type="number"
+                  placeholder="Number of nodes (1-50)"
+                  value={bulkNodeCount}
+                  onChange={(e) => setBulkNodeCount(e.target.value)}
+                  min="1"
+                  max="50"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      addBulkNodes();
+                    }
+                  }}
+                />
+                <button 
+                  onClick={addBulkNodes}
+                  className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
+                >
+                  Add Bulk Nodes
+                </button>
+              </div>
+
+              {/* Delete Node */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Delete Node</label>
                 <input 
                   type="number"
                   placeholder="Node ID to Delete"
                   value={deleteNodeId}
                   onChange={(e) => setDeleteNodeId(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
                   onKeyPress={(e) => {
                     if (e.key === 'Enter') {
                       deleteNode();
@@ -214,14 +276,14 @@ export default function GraphVisualizer() {
                     placeholder="From"
                     value={addEdgeFrom}
                     onChange={(e) => setAddEdgeFrom(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500"
+                    className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                   />
                   <input 
                     type="number"
                     placeholder="To"
                     value={addEdgeTo}
                     onChange={(e) => setAddEdgeTo(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500"
+                    className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                     onKeyPress={(e) => {
                       if (e.key === 'Enter') {
                         addEdge();
@@ -246,14 +308,14 @@ export default function GraphVisualizer() {
                     placeholder="From"
                     value={deleteEdgeFrom}
                     onChange={(e) => setDeleteEdgeFrom(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500"
+                    className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
                   />
                   <input 
                     type="number"
                     placeholder="To"
                     value={deleteEdgeTo}
                     onChange={(e) => setDeleteEdgeTo(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500"
+                    className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
                     onKeyPress={(e) => {
                       if (e.key === 'Enter') {
                         deleteEdge();
@@ -280,14 +342,14 @@ export default function GraphVisualizer() {
                     placeholder="Start"
                     value={start}
                     onChange={(e) => setStart(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500"
+                    className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                   />
                   <input 
                     type="number"
                     placeholder="End"
                     value={end}
                     onChange={(e) => setEnd(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500"
+                    className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                     onKeyPress={(e) => {
                       if (e.key === 'Enter') {
                         compute();
@@ -297,7 +359,7 @@ export default function GraphVisualizer() {
                 </div>
                 <button 
                   onClick={compute}
-                  className="w-full bg-gradient-to-r from-gray-800 to-black hover:from-black hover:to-gray-900 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
+                  className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
                 >
                   Find Shortest Path
                 </button>
@@ -309,6 +371,26 @@ export default function GraphVisualizer() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Graph Stats */}
+        <div className="bg-white rounded-lg shadow-lg p-4 mb-6 border border-gray-200">
+          <div className="flex flex-wrap gap-6 text-sm text-gray-600">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold">Nodes:</span>
+              <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">{nodes.length}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="font-semibold">Edges:</span>
+              <span className="bg-green-100 text-green-800 px-2 py-1 rounded">{edges.length}</span>
+            </div>
+            {nodes.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="font-semibold">Node IDs:</span>
+                <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded">{nodes.map(n => n.id).sort((a, b) => a - b).join(', ')}</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -339,7 +421,6 @@ export default function GraphVisualizer() {
                 const b = nodes.find(n => n.id === e.to);
                 if (!a || !b) return null;
                 
-                // Check if edge is part of the shortest path
                 const idxA = path.indexOf(e.from);
                 const idxB = path.indexOf(e.to);
                 const isOnPath = idxA !== -1 && idxB !== -1 && Math.abs(idxA - idxB) === 1;
@@ -351,7 +432,7 @@ export default function GraphVisualizer() {
                     y1={a.y}
                     x2={b.x}
                     y2={b.y}
-                    stroke={isOnPath ? '#374151' : '#9CA3AF'}
+                    stroke={isOnPath ? '#7C3AED' : '#9CA3AF'}
                     strokeWidth={isOnPath ? 3 : 2}
                     className="transition-all duration-300"
                   />
@@ -365,8 +446,8 @@ export default function GraphVisualizer() {
                     cx={n.x}
                     cy={n.y}
                     r={25}
-                    fill={path.includes(n.id) ? '#1F2937' : '#E5E7EB'}
-                    stroke={path.includes(n.id) ? '#000000' : '#6B7280'}
+                    fill={path.includes(n.id) ? '#7C3AED' : '#E5E7EB'}
+                    stroke={path.includes(n.id) ? '#5B21B6' : '#6B7280'}
                     strokeWidth={path.includes(n.id) ? 3 : 2}
                     className="transition-all duration-300 cursor-move hover:stroke-gray-400"
                     onMouseDown={(e) => handleMouseDown(e, n)}
@@ -394,12 +475,14 @@ export default function GraphVisualizer() {
         <div className="mt-6 bg-gray-50 rounded-lg p-4 border border-gray-200">
           <h4 className="font-semibold text-gray-800 mb-2">Instructions:</h4>
           <ul className="text-sm text-gray-600 space-y-1">
-            <li>• Add nodes by clicking "Add Node" - they'll appear at random positions</li>
+            <li>• Add single nodes with "Add Single Node" or multiple nodes at once with "Add Bulk Nodes"</li>
+            <li>• For bulk addition, enter a number between 1-50 and click "Add Bulk Nodes"</li>
             <li>• Drag nodes around to reposition them and avoid overlaps</li>
             <li>• Create edges by entering node IDs and clicking "Add Edge"</li>
             <li>• Delete nodes or edges by entering IDs and clicking respective delete buttons</li>
             <li>• Find shortest path by entering start and end node IDs</li>
-            <li>• Path nodes and edges will be highlighted in dark gray/black</li>
+            <li>• Path nodes and edges will be highlighted in purple</li>
+            <li>• View current graph stats (nodes, edges, node IDs) above the visualization</li>
             <li>• Use "Clear Graph" to start over</li>
           </ul>
         </div>
