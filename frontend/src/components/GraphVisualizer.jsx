@@ -195,7 +195,7 @@ export default function GraphVisualizer() {
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-gray-800 mb-2">Graph Theory Visualizer</h1>
-          <p className="text-gray-600">Interactive Graph Theory Visualizer with Bulk Node Addition</p>
+          <p className="text-gray-600">Interactive Graph Theory Visualizer</p>
         </div>
 
         {/* Control Panel */}
