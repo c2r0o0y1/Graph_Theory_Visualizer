@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { shortestPath } from '../algorithms/shortestPath';
 
 export default function GraphVisualizer() {
@@ -15,9 +15,71 @@ export default function GraphVisualizer() {
   const [bulkNodeCount, setBulkNodeCount] = useState('');
   const [draggedNode, setDraggedNode] = useState(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  
+  // Mathematical visualization features
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const [history, setHistory] = useState([]);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [animationPath, setAnimationPath] = useState([]);
+  const [animationIndex, setAnimationIndex] = useState(0);
+  const [showCoordinates, setShowCoordinates] = useState(false);
+  const [showDistance, setShowDistance] = useState(false);
+  const [algorithmInfo, setAlgorithmInfo] = useState('');
+  const [autoEdgeCount, setAutoEdgeCount] = useState('');
 
   const width = 800;
   const height = 500;
+  const svgRef = useRef(null);
+
+  // Mathematical coordinate system
+  const transformPoint = (x, y) => ({
+    x: (x - pan.x) / zoom,
+    y: (y - pan.y) / zoom
+  });
+
+  const inverseTransformPoint = (x, y) => ({
+    x: x * zoom + pan.x,
+    y: y * zoom + pan.y
+  });
+
+  // History management for mathematical operations
+  const saveToHistory = (newNodes, newEdges, operation = '') => {
+    const timestamp = Date.now();
+    setHistory(prev => [...prev.slice(0, currentStep), { 
+      nodes: newNodes, 
+      edges: newEdges, 
+      operation,
+      timestamp 
+    }]);
+    setCurrentStep(prev => prev + 1);
+  };
+
+  const undo = () => {
+    if (currentStep > 0) {
+      const newStep = currentStep - 1;
+      const previousState = history[newStep - 1] || { nodes: [], edges: [] };
+      setNodes(previousState.nodes);
+      setEdges(previousState.edges);
+      setCurrentStep(newStep);
+      setPath([]);
+      setAlgorithmInfo(`Undone: ${previousState.operation || 'Previous operation'}`);
+    }
+  };
+
+  const redo = () => {
+    if (currentStep < history.length) {
+      const nextState = history[currentStep];
+      setNodes(nextState.nodes);
+      setEdges(nextState.edges);
+      setCurrentStep(prev => prev + 1);
+      setPath([]);
+      setAlgorithmInfo(`Redone: ${nextState.operation || 'Next operation'}`);
+    }
+  };
 
   const addNode = () => {
     const id = nodes.length > 0 ? Math.max(...nodes.map(n => n.id)) + 1 : 1;
@@ -37,7 +99,9 @@ export default function GraphVisualizer() {
       return distance < minDistance;
     }));
     
-    setNodes([...nodes, { id, x, y }]);
+    const newNodes = [...nodes, { id, x, y }];
+    setNodes(newNodes);
+    saveToHistory(newNodes, edges, `Added node ${id}`);
   };
 
   const addBulkNodes = () => {
@@ -71,16 +135,21 @@ export default function GraphVisualizer() {
       newNodes.push({ id, x, y });
     }
 
-    setNodes([...nodes, ...newNodes]);
+    const finalNodes = [...nodes, ...newNodes];
+    setNodes(finalNodes);
     setBulkNodeCount('');
+    saveToHistory(finalNodes, edges, `Added ${count} nodes (${startId}-${startId + count - 1})`);
   };
 
   const deleteNode = () => {
     const id = parseInt(deleteNodeId);
     if (isNaN(id)) return;
-    setNodes(nodes.filter(n => n.id !== id));
-    setEdges(edges.filter(e => e.from !== id && e.to !== id));
+    const newNodes = nodes.filter(n => n.id !== id);
+    const newEdges = edges.filter(e => e.from !== id && e.to !== id);
+    setNodes(newNodes);
+    setEdges(newEdges);
     setDeleteNodeId('');
+    saveToHistory(newNodes, newEdges, `Deleted node ${id}`);
   };
 
   const addEdge = () => {
@@ -93,7 +162,9 @@ export default function GraphVisualizer() {
     );
     
     if (!edgeExists) {
-      setEdges([...edges, { from: fromId, to: toId }]);
+      const newEdges = [...edges, { from: fromId, to: toId }];
+      setEdges(newEdges);
+      saveToHistory(nodes, newEdges, `Added edge ${fromId} → ${toId}`);
     }
     setAddEdgeFrom('');
     setAddEdgeTo('');
@@ -103,11 +174,13 @@ export default function GraphVisualizer() {
     const fromId = parseInt(deleteEdgeFrom);
     const toId = parseInt(deleteEdgeTo);
     if (isNaN(fromId) || isNaN(toId)) return;
-    setEdges(edges.filter(e => 
+    const newEdges = edges.filter(e => 
       !((e.from === fromId && e.to === toId) || (e.from === toId && e.to === fromId))
-    ));
+    );
+    setEdges(newEdges);
     setDeleteEdgeFrom('');
     setDeleteEdgeTo('');
+    saveToHistory(nodes, newEdges, `Deleted edge ${fromId} ↔ ${toId}`);
   };
 
   const compute = () => {
@@ -136,6 +209,33 @@ export default function GraphVisualizer() {
     
     const result = shortestPath(adj, startId, endId);
     setPath(result);
+    
+    if (result.length > 0) {
+      setAnimationPath(result);
+      setAnimationIndex(0);
+      setIsAnimating(true);
+      setAlgorithmInfo(`Found path: ${result.join(' → ')} (Length: ${result.length - 1})`);
+    } else {
+      setAlgorithmInfo('No path found between specified nodes');
+    }
+  };
+
+  // Mathematical step-by-step animation
+  const nextStep = () => {
+    if (animationIndex < animationPath.length - 1) {
+      setAnimationIndex(prev => prev + 1);
+      setAlgorithmInfo(`Step ${animationIndex + 2}: Visiting node ${animationPath[animationIndex + 1]}`);
+    } else {
+      setIsAnimating(false);
+      setAlgorithmInfo('Animation complete');
+    }
+  };
+
+  const prevStep = () => {
+    if (animationIndex > 0) {
+      setAnimationIndex(prev => prev - 1);
+      setAlgorithmInfo(`Step ${animationIndex}: Back to node ${animationPath[animationIndex - 1]}`);
+    }
   };
 
   const clearGraph = () => {
@@ -150,7 +250,142 @@ export default function GraphVisualizer() {
     setDeleteEdgeTo('');
     setDeleteNodeId('');
     setBulkNodeCount('');
+    setAutoEdgeCount('');
     setDraggedNode(null);
+    setHistory([]);
+    setCurrentStep(0);
+    setIsAnimating(false);
+    setAnimationPath([]);
+    setAnimationIndex(0);
+    setAlgorithmInfo('Graph cleared');
+  };
+
+  // Auto-generate random edges
+  const generateRandomEdges = () => {
+    if (nodes.length < 2) {
+      setAlgorithmInfo('Need at least 2 nodes to create edges');
+      return;
+    }
+
+    const count = parseInt(autoEdgeCount);
+    if (isNaN(count) || count <= 0) {
+      setAlgorithmInfo('Please enter a valid number of edges');
+      return;
+    }
+
+    const newEdges = [...edges];
+    const maxPossibleEdges = (nodes.length * (nodes.length - 1)) / 2;
+    const edgesToAdd = Math.min(count, maxPossibleEdges - edges.length);
+
+    if (edgesToAdd <= 0) {
+      setAlgorithmInfo('Graph is already complete or too many edges requested');
+      return;
+    }
+
+    let attempts = 0;
+    const maxAttempts = edgesToAdd * 10;
+
+    while (newEdges.length < edges.length + edgesToAdd && attempts < maxAttempts) {
+      const fromIndex = Math.floor(Math.random() * nodes.length);
+      const toIndex = Math.floor(Math.random() * nodes.length);
+      
+      if (fromIndex !== toIndex) {
+        const fromId = nodes[fromIndex].id;
+        const toId = nodes[toIndex].id;
+        
+        const edgeExists = newEdges.some(e => 
+          (e.from === fromId && e.to === toId) || (e.from === toId && e.to === fromId)
+        );
+        
+        if (!edgeExists) {
+          newEdges.push({ from: fromId, to: toId });
+        }
+      }
+      attempts++;
+    }
+
+    setEdges(newEdges);
+    setAutoEdgeCount('');
+    saveToHistory(nodes, newEdges, `Generated ${newEdges.length - edges.length} random edges`);
+    setAlgorithmInfo(`Added ${newEdges.length - edges.length} random edges`);
+  };
+
+  // Create complete graph (all nodes connected to all others)
+  const createCompleteGraph = () => {
+    if (nodes.length < 2) {
+      setAlgorithmInfo('Need at least 2 nodes to create a complete graph');
+      return;
+    }
+
+    const newEdges = [];
+    
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        newEdges.push({ from: nodes[i].id, to: nodes[j].id });
+      }
+    }
+
+    setEdges(newEdges);
+    saveToHistory(nodes, newEdges, `Created complete graph with ${newEdges.length} edges`);
+    setAlgorithmInfo(`Created complete graph with ${newEdges.length} edges`);
+  };
+
+  // Create a cycle graph
+  const createCycleGraph = () => {
+    if (nodes.length < 3) {
+      setAlgorithmInfo('Need at least 3 nodes to create a cycle');
+      return;
+    }
+
+    const newEdges = [];
+    
+    for (let i = 0; i < nodes.length; i++) {
+      const nextIndex = (i + 1) % nodes.length;
+      newEdges.push({ from: nodes[i].id, to: nodes[nextIndex].id });
+    }
+
+    setEdges(newEdges);
+    saveToHistory(nodes, newEdges, `Created cycle graph with ${newEdges.length} edges`);
+    setAlgorithmInfo(`Created cycle graph with ${newEdges.length} edges`);
+  };
+
+  // Create a star graph (one central node connected to all others)
+  const createStarGraph = () => {
+    if (nodes.length < 2) {
+      setAlgorithmInfo('Need at least 2 nodes to create a star graph');
+      return;
+    }
+
+    const newEdges = [];
+    const centerNode = nodes[0].id;
+    
+    for (let i = 1; i < nodes.length; i++) {
+      newEdges.push({ from: centerNode, to: nodes[i].id });
+    }
+
+    setEdges(newEdges);
+    saveToHistory(nodes, newEdges, `Created star graph with ${newEdges.length} edges`);
+    setAlgorithmInfo(`Created star graph with ${newEdges.length} edges`);
+  };
+
+  // Mathematical zoom and pan
+  const handleZoom = (delta) => {
+    setZoom(prev => Math.max(0.3, Math.min(5, prev + delta)));
+  };
+
+  const handleWheel = (e) => {
+    // Only zoom when hovering over the SVG graph area
+    if (e.target.closest('svg')) {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -0.1 : 0.1;
+      handleZoom(delta);
+    }
+  };
+
+  const handlePanStart = (e) => {
+    if (e.target.tagName === 'circle') return;
+    setIsPanning(true);
+    setPanStart({ x: e.clientX, y: e.clientY });
   };
 
   const handleMouseDown = (e, node) => {
@@ -167,44 +402,141 @@ export default function GraphVisualizer() {
   };
 
   const handleMouseMove = (e) => {
-    if (!draggedNode) return;
-    
-    e.preventDefault();
-    const rect = e.currentTarget.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-    
-    const newX = Math.max(25, Math.min(width - 25, mouseX - dragOffset.x));
-    const newY = Math.max(25, Math.min(height - 25, mouseY - dragOffset.y));
-    
-    setNodes(nodes.map(node => 
-      node.id === draggedNode 
-        ? { ...node, x: newX, y: newY }
-        : node
-    ));
+    if (draggedNode) {
+      e.preventDefault();
+      const rect = e.currentTarget.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      
+      const newX = Math.max(25, Math.min(width - 25, mouseX - dragOffset.x));
+      const newY = Math.max(25, Math.min(height - 25, mouseY - dragOffset.y));
+      
+      const newNodes = nodes.map(node => 
+        node.id === draggedNode 
+          ? { ...node, x: newX, y: newY }
+          : node
+      );
+      setNodes(newNodes);
+    } else if (isPanning) {
+      const deltaX = e.clientX - panStart.x;
+      const deltaY = e.clientY - panStart.y;
+      setPan(prev => ({
+        x: prev.x + deltaX,
+        y: prev.y + deltaY
+      }));
+      setPanStart({ x: e.clientX, y: e.clientY });
+    }
   };
 
   const handleMouseUp = () => {
+    if (draggedNode) {
+      saveToHistory(nodes, edges, `Moved node ${draggedNode}`);
+    }
     setDraggedNode(null);
     setDragOffset({ x: 0, y: 0 });
+    setIsPanning(false);
   };
 
+  // Mathematical path calculation
+  const getCurrentPath = () => {
+    if (!isAnimating) return path;
+    return animationPath.slice(0, animationIndex + 1);
+  };
+
+  const currentPath = getCurrentPath();
+
+  // Calculate mathematical properties
+  const calculateGraphProperties = () => {
+    const nodeCount = nodes.length;
+    const edgeCount = edges.length;
+    const connectedComponents = calculateConnectedComponents();
+    const averageDegree = edgeCount > 0 ? (2 * edgeCount) / nodeCount : 0;
+    
+    return {
+      nodeCount,
+      edgeCount,
+      connectedComponents,
+      averageDegree: averageDegree.toFixed(2)
+    };
+  };
+
+  const calculateConnectedComponents = () => {
+    if (nodes.length === 0) return 0;
+    
+    const visited = new Set();
+    let components = 0;
+    
+    const dfs = (nodeId) => {
+      visited.add(nodeId);
+      const neighbors = edges
+        .filter(e => e.from === nodeId || e.to === nodeId)
+        .map(e => e.from === nodeId ? e.to : e.from);
+      
+      neighbors.forEach(neighbor => {
+        if (!visited.has(neighbor)) {
+          dfs(neighbor);
+        }
+      });
+    };
+    
+    nodes.forEach(node => {
+      if (!visited.has(node.id)) {
+        dfs(node.id);
+        components++;
+      }
+    });
+    
+    return components;
+  };
+
+  const graphProps = calculateGraphProperties();
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-100 to-gray-200">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="container mx-auto px-4 py-8">
-        {/* Header */}
+        {/* Mathematical Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-800 mb-2">Graph Theory Visualizer</h1>
-          <p className="text-gray-600">Interactive Graph Theory Visualizer</p>
+          <h1 className="text-4xl font-bold text-slate-800 mb-2">Graph Theory Visualizer</h1>
+          <p className="text-slate-600 text-lg">Interactive shortest path finder</p>
+          <div className="mt-4 p-3 bg-white rounded-lg shadow-sm border border-slate-200">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              <div className="text-center">
+                <span className="font-semibold text-slate-700">Nodes:</span>
+                <div className="text-2xl font-bold text-blue-600">{graphProps.nodeCount}</div>
+              </div>
+              <div className="text-center">
+                <span className="font-semibold text-slate-700">Edges:</span>
+                <div className="text-2xl font-bold text-green-600">{graphProps.edgeCount}</div>
+              </div>
+              <div className="text-center">
+                <span className="font-semibold text-slate-700">Components:</span>
+                <div className="text-2xl font-bold text-purple-600">{graphProps.connectedComponents}</div>
+              </div>
+              <div className="text-center">
+                <span className="font-semibold text-slate-700">Avg Degree:</span>
+                <div className="text-2xl font-bold text-orange-600">{graphProps.averageDegree}</div>
+              </div>
+            </div>
+          </div>
         </div>
 
+        {/* Algorithm Information */}
+        {algorithmInfo && (
+          <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-center">
+              <div className="w-2 h-2 bg-blue-500 rounded-full mr-3 animate-pulse"></div>
+              <span className="text-blue-800 font-medium">{algorithmInfo}</span>
+            </div>
+          </div>
+        )}
+
         {/* Control Panel */}
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-6 border border-gray-200">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-6 border border-slate-200">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
             
             {/* Node Operations */}
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-800 border-b border-gray-300 pb-2">Node Operations</h3>
+              <h3 className="text-lg font-semibold text-slate-800 border-b border-slate-300 pb-2">Node Operations</h3>
               
               {/* Single Node */}
               <button 
@@ -216,7 +548,7 @@ export default function GraphVisualizer() {
 
               {/* Bulk Nodes */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Add Multiple Nodes</label>
+                <label className="text-sm font-medium text-slate-700">Add Multiple Nodes</label>
                 <input 
                   type="number"
                   placeholder="Number of nodes (1-50)"
@@ -224,7 +556,7 @@ export default function GraphVisualizer() {
                   onChange={(e) => setBulkNodeCount(e.target.value)}
                   min="1"
                   max="50"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   onKeyPress={(e) => {
                     if (e.key === 'Enter') {
                       addBulkNodes();
@@ -241,13 +573,13 @@ export default function GraphVisualizer() {
 
               {/* Delete Node */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Delete Node</label>
+                <label className="text-sm font-medium text-slate-700">Delete Node</label>
                 <input 
                   type="number"
                   placeholder="Node ID to Delete"
                   value={deleteNodeId}
                   onChange={(e) => setDeleteNodeId(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
                   onKeyPress={(e) => {
                     if (e.key === 'Enter') {
                       deleteNode();
@@ -265,25 +597,25 @@ export default function GraphVisualizer() {
 
             {/* Edge Operations */}
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-800 border-b border-gray-300 pb-2">Edge Operations</h3>
+              <h3 className="text-lg font-semibold text-slate-800 border-b border-slate-300 pb-2">Edge Operations</h3>
               
               {/* Add Edge */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Add Edge</label>
+                <label className="text-sm font-medium text-slate-700">Add Edge</label>
                 <div className="grid grid-cols-2 gap-2">
                   <input 
                     type="number"
                     placeholder="From"
                     value={addEdgeFrom}
                     onChange={(e) => setAddEdgeFrom(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                   />
                   <input 
                     type="number"
                     placeholder="To"
                     value={addEdgeTo}
                     onChange={(e) => setAddEdgeTo(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                     onKeyPress={(e) => {
                       if (e.key === 'Enter') {
                         addEdge();
@@ -301,21 +633,21 @@ export default function GraphVisualizer() {
 
               {/* Delete Edge */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Delete Edge</label>
+                <label className="text-sm font-medium text-slate-700">Delete Edge</label>
                 <div className="grid grid-cols-2 gap-2">
                   <input 
                     type="number"
                     placeholder="From"
                     value={deleteEdgeFrom}
                     onChange={(e) => setDeleteEdgeFrom(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                    className="px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
                   />
                   <input 
                     type="number"
                     placeholder="To"
                     value={deleteEdgeTo}
                     onChange={(e) => setDeleteEdgeTo(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                    className="px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
                     onKeyPress={(e) => {
                       if (e.key === 'Enter') {
                         deleteEdge();
@@ -330,11 +662,61 @@ export default function GraphVisualizer() {
                   Delete Edge
                 </button>
               </div>
+
+              {/* Auto Edge Generation */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">Auto Edge Generation</label>
+                <div className="space-y-2">
+                  <input 
+                    type="number"
+                    placeholder="Number of random edges"
+                    value={autoEdgeCount}
+                    onChange={(e) => setAutoEdgeCount(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        generateRandomEdges();
+                      }
+                    }}
+                  />
+                  <button 
+                    onClick={generateRandomEdges}
+                    className="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                  >
+                    Generate Random Edges
+                  </button>
+                </div>
+              </div>
+
+              {/* Graph Templates */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">Graph Templates</label>
+                <div className="grid grid-cols-1 gap-2">
+                  <button 
+                    onClick={createCompleteGraph}
+                    className="w-full bg-purple-500 hover:bg-purple-600 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                  >
+                    Complete Graph
+                  </button>
+                  <button 
+                    onClick={createCycleGraph}
+                    className="w-full bg-teal-500 hover:bg-teal-600 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                  >
+                    Cycle Graph
+                  </button>
+                  <button 
+                    onClick={createStarGraph}
+                    className="w-full bg-amber-500 hover:bg-amber-600 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                  >
+                    Star Graph
+                  </button>
+                </div>
+              </div>
             </div>
 
             {/* Path Operations */}
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-800 border-b border-gray-300 pb-2">Path Finding</h3>
+              <h3 className="text-lg font-semibold text-slate-800 border-b border-slate-300 pb-2">Path Finding</h3>
               <div className="space-y-2">
                 <div className="grid grid-cols-2 gap-2">
                   <input 
@@ -342,14 +724,14 @@ export default function GraphVisualizer() {
                     placeholder="Start"
                     value={start}
                     onChange={(e) => setStart(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                   />
                   <input 
                     type="number"
                     placeholder="End"
                     value={end}
                     onChange={(e) => setEnd(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                     onKeyPress={(e) => {
                       if (e.key === 'Enter') {
                         compute();
@@ -371,12 +753,88 @@ export default function GraphVisualizer() {
                 </button>
               </div>
             </div>
+
+            {/* Mathematical Controls */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-slate-800 border-b border-slate-300 pb-2">Mathematical Tools</h3>
+              
+              {/* Undo/Redo */}
+              <div className="grid grid-cols-2 gap-2">
+                <button 
+                  onClick={undo}
+                  disabled={currentStep === 0}
+                  className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                >
+                  Undo
+                </button>
+                <button 
+                  onClick={redo}
+                  disabled={currentStep >= history.length}
+                  className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                >
+                  Redo
+                </button>
+              </div>
+
+
+
+              {/* Animation Controls */}
+              {isAnimating && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-700">Step Animation</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button 
+                      onClick={prevStep}
+                      disabled={animationIndex === 0}
+                      className="bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                    >
+                      Previous
+                    </button>
+                    <button 
+                      onClick={nextStep}
+                      disabled={animationIndex >= animationPath.length - 1}
+                      className="bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                    >
+                      Next
+                    </button>
+                  </div>
+                  <div className="text-xs text-slate-600 text-center">
+                    Step {animationIndex + 1} of {animationPath.length}
+                  </div>
+                </div>
+              )}
+
+              {/* Mathematical Display Options */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">Display Options</label>
+                <div className="space-y-1">
+                  <label className="flex items-center text-sm">
+                    <input 
+                      type="checkbox" 
+                      checked={showCoordinates}
+                      onChange={(e) => setShowCoordinates(e.target.checked)}
+                      className="mr-2"
+                    />
+                    Show Coordinates
+                  </label>
+                  <label className="flex items-center text-sm">
+                    <input 
+                      type="checkbox" 
+                      checked={showDistance}
+                      onChange={(e) => setShowDistance(e.target.checked)}
+                      className="mr-2"
+                    />
+                    Show Distances
+                  </label>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Graph Stats */}
-        <div className="bg-white rounded-lg shadow-lg p-4 mb-6 border border-gray-200">
-          <div className="flex flex-wrap gap-6 text-sm text-gray-600">
+        <div className="bg-white rounded-lg shadow-lg p-4 mb-6 border border-slate-200">
+          <div className="flex flex-wrap gap-6 text-sm text-slate-600">
             <div className="flex items-center gap-2">
               <span className="font-semibold">Nodes:</span>
               <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">{nodes.length}</span>
@@ -395,86 +853,140 @@ export default function GraphVisualizer() {
         </div>
 
         {/* Graph Visualization */}
-        <div className="bg-white rounded-lg shadow-lg p-6 border border-gray-200">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
-            <h3 className="text-lg font-semibold text-gray-800">Graph Visualization</h3>
-            {path.length > 0 && (
-              <div className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
-                Path: {path.join(' → ')} (Length: {path.length - 1})
+        <div className="bg-white rounded-lg shadow-lg p-6 border border-slate-200">
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
+              <h3 className="text-lg font-semibold text-slate-800">Graph Visualization</h3>
+              <div className="flex items-center gap-4">
+                {currentPath.length > 0 && (
+                  <div className="text-sm text-slate-600 bg-slate-100 px-3 py-1 rounded-full">
+                    Path: {currentPath.join(' → ')} (Length: {currentPath.length - 1})
+                  </div>
+                )}
+                <div className="text-sm text-slate-500">
+                  Zoom: ×{zoom.toFixed(1)} | Mouse wheel to zoom
+                </div>
               </div>
-            )}
-          </div>
+            </div>
           
           <div className="flex justify-center overflow-x-auto">
-            <svg 
-              width={width} 
-              height={height} 
-              className="border-2 border-gray-300 rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 min-w-full"
-              viewBox={`0 0 ${width} ${height}`}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-              onMouseLeave={handleMouseUp}
-            >
+                          <svg 
+                ref={svgRef}
+                width={width} 
+                height={height} 
+                className="border-2 border-slate-300 rounded-lg bg-gradient-to-br from-slate-50 to-slate-100 min-w-full"
+                viewBox={`0 0 ${width} ${height}`}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseUp}
+                onMouseDown={handlePanStart}
+                onWheel={handleWheel}
+                style={{
+                  transform: `scale(${zoom}) translate(${pan.x}px, ${pan.y}px)`,
+                  transformOrigin: 'center',
+                  transition: draggedNode || isPanning ? 'none' : 'transform 0.1s ease-out',
+                  cursor: isPanning ? 'grabbing' : 'grab'
+                }}
+              >
               {/* Edges */}
               {edges.map((e, i) => {
                 const a = nodes.find(n => n.id === e.from);
                 const b = nodes.find(n => n.id === e.to);
                 if (!a || !b) return null;
                 
-                const idxA = path.indexOf(e.from);
-                const idxB = path.indexOf(e.to);
+                const idxA = currentPath.indexOf(e.from);
+                const idxB = currentPath.indexOf(e.to);
                 const isOnPath = idxA !== -1 && idxB !== -1 && Math.abs(idxA - idxB) === 1;
+                const isCurrentStep = isAnimating && idxA === animationIndex && idxB === animationIndex + 1;
+                
+                // Calculate distance for display
+                const distance = Math.sqrt(Math.pow(b.x - a.x, 2) + Math.pow(b.y - a.y, 2));
+                const midX = (a.x + b.x) / 2;
+                const midY = (a.y + b.y) / 2;
                 
                 return (
-                  <line
-                    key={i}
-                    x1={a.x}
-                    y1={a.y}
-                    x2={b.x}
-                    y2={b.y}
-                    stroke={isOnPath ? '#7C3AED' : '#9CA3AF'}
-                    strokeWidth={isOnPath ? 3 : 2}
-                    className="transition-all duration-300"
-                  />
+                  <g key={i}>
+                    <line
+                      x1={a.x}
+                      y1={a.y}
+                      x2={b.x}
+                      y2={b.y}
+                      stroke={isCurrentStep ? '#EF4444' : isOnPath ? '#7C3AED' : '#9CA3AF'}
+                      strokeWidth={isCurrentStep ? 4 : isOnPath ? 3 : 2}
+                      className="transition-all duration-300"
+                    />
+                    {showDistance && (
+                      <text
+                        x={midX}
+                        y={midY}
+                        textAnchor="middle"
+                        dy="-5"
+                        fontSize={10}
+                        fill="#6B7280"
+                        className="pointer-events-none"
+                      >
+                        {distance.toFixed(0)}
+                      </text>
+                    )}
+                  </g>
                 );
               })}
 
               {/* Nodes */}
-              {nodes.map(n => (
-                <g key={n.id}>
-                  <circle
-                    cx={n.x}
-                    cy={n.y}
-                    r={25}
-                    fill={path.includes(n.id) ? '#7C3AED' : '#E5E7EB'}
-                    stroke={path.includes(n.id) ? '#5B21B6' : '#6B7280'}
-                    strokeWidth={path.includes(n.id) ? 3 : 2}
-                    className="transition-all duration-300 cursor-move hover:stroke-gray-400"
+              {nodes.map(n => {
+                const isInPath = currentPath.includes(n.id);
+                const isCurrentStep = isAnimating && n.id === animationPath[animationIndex];
+                
+                return (
+                  <g 
+                    key={n.id}
                     onMouseDown={(e) => handleMouseDown(e, n)}
                     style={{ cursor: draggedNode === n.id ? 'grabbing' : 'grab' }}
-                  />
-                  <text
-                    x={n.x}
-                    y={n.y}
-                    textAnchor="middle"
-                    dy=".3em"
-                    fontSize={14}
-                    fontWeight="bold"
-                    fill={path.includes(n.id) ? '#FFFFFF' : '#374151'}
-                    className="transition-all duration-300 pointer-events-none select-none"
+                    className="transition-all duration-300"
                   >
-                    {n.id}
-                  </text>
-                </g>
-              ))}
+                    <circle
+                      cx={n.x}
+                      cy={n.y}
+                      r={25}
+                      fill={isCurrentStep ? '#EF4444' : isInPath ? '#7C3AED' : '#E5E7EB'}
+                      stroke={isCurrentStep ? '#DC2626' : isInPath ? '#5B21B6' : '#6B7280'}
+                      strokeWidth={isCurrentStep ? 4 : isInPath ? 3 : 2}
+                      className="transition-all duration-300 hover:stroke-slate-400"
+                    />
+                    <text
+                      x={n.x}
+                      y={n.y}
+                      textAnchor="middle"
+                      dy=".3em"
+                      fontSize={14}
+                      fontWeight="bold"
+                      fill={isCurrentStep ? '#FFFFFF' : isInPath ? '#FFFFFF' : '#374151'}
+                      className="transition-all duration-300 select-none"
+                    >
+                      {n.id}
+                    </text>
+                    {showCoordinates && (
+                      <text
+                        x={n.x}
+                        y={n.y + 40}
+                        textAnchor="middle"
+                        fontSize={10}
+                        fill="#6B7280"
+                        className="pointer-events-none"
+                      >
+                        ({n.x.toFixed(0)}, {n.y.toFixed(0)})
+                      </text>
+                    )}
+                  </g>
+                );
+              })}
             </svg>
           </div>
         </div>
 
         {/* Instructions */}
-        <div className="mt-6 bg-gray-50 rounded-lg p-4 border border-gray-200">
-          <h4 className="font-semibold text-gray-800 mb-2">Instructions:</h4>
-          <ul className="text-sm text-gray-600 space-y-1">
+        <div className="mt-6 bg-slate-50 rounded-lg p-4 border border-slate-200">
+          <h4 className="font-semibold text-slate-800 mb-2">Mathematical Instructions:</h4>
+          <ul className="text-sm text-slate-600 space-y-1">
             <li>• Add single nodes with "Add Single Node" or multiple nodes at once with "Add Bulk Nodes"</li>
             <li>• For bulk addition, enter a number between 1-50 and click "Add Bulk Nodes"</li>
             <li>• Drag nodes around to reposition them and avoid overlaps</li>
@@ -482,6 +994,8 @@ export default function GraphVisualizer() {
             <li>• Delete nodes or edges by entering IDs and clicking respective delete buttons</li>
             <li>• Find shortest path by entering start and end node IDs</li>
             <li>• Path nodes and edges will be highlighted in purple</li>
+            <li>• Use zoom controls and pan by dragging on empty areas</li>
+            <li>• Step through the algorithm with Previous/Next buttons</li>
             <li>• View current graph stats (nodes, edges, node IDs) above the visualization</li>
             <li>• Use "Clear Graph" to start over</li>
           </ul>
