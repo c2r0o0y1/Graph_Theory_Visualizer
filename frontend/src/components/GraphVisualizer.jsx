@@ -15,6 +15,11 @@ export default function GraphVisualizer() {
   const [bulkNodeCount, setBulkNodeCount] = useState('');
   const [draggedNode, setDraggedNode] = useState(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+
+  // Maximum degree constraint
+  const [maxDegree, setMaxDegree] = useState('');
+  const [enforceMaxDegree, setEnforceMaxDegree] = useState(false);
+  
   
   // Mathematical visualization features
   const [zoom, setZoom] = useState(1);
@@ -30,10 +35,61 @@ export default function GraphVisualizer() {
   const [showDistance, setShowDistance] = useState(false);
   const [algorithmInfo, setAlgorithmInfo] = useState('');
   const [autoEdgeCount, setAutoEdgeCount] = useState('');
-
+  const [nodeColors, setNodeColors] = useState({});
+  const [showDegrees, setShowDegrees] = useState(false);
   const width = 800;
   const height = 500;
   const svgRef = useRef(null);
+
+   // Calculate degree of a node
+   const getNodeDegree = (nodeId) => {
+    return edges.filter(e => e.from === nodeId || e.to === nodeId).length;
+  };
+
+  // Get all node degrees
+  const getNodeDegrees = () => {
+    const degrees = {};
+    nodes.forEach(node => {
+      degrees[node.id] = getNodeDegree(node.id);
+    });
+    return degrees;
+  };
+
+  // Check if adding an edge would violate max degree
+  const wouldViolateMaxDegree = (fromId, toId) => {
+    if (!enforceMaxDegree || !maxDegree) return false;
+    
+    const maxDeg = parseInt(maxDegree);
+    const fromDegree = getNodeDegree(fromId);
+    const toDegree = getNodeDegree(toId);
+    
+    return fromDegree >= maxDeg || toDegree >= maxDeg;
+  };
+
+  // Color nodes based on degree (for visualization)
+  const colorNodesByDegree = () => {
+    if (!enforceMaxDegree || !maxDegree) {
+      setNodeColors({});
+      return;
+    }
+    
+    const maxDeg = parseInt(maxDegree);
+    const colors = ['#10B981', '#3B82F6', '#8B5CF6', '#EC4899', '#F59E0B', '#EF4444'];
+    const newColors = {};
+    
+    nodes.forEach(node => {
+      const degree = getNodeDegree(node.id);
+      const colorIndex = Math.min(degree, colors.length - 1);
+      newColors[node.id] = colors[colorIndex];
+    });
+    
+    setNodeColors(newColors);
+  };
+
+  // Update colors when edges or max degree changes
+  useEffect(() => {
+    colorNodesByDegree();
+  }, [edges.length, nodes.length, maxDegree, enforceMaxDegree]);
 
   // Mathematical coordinate system
   const transformPoint = (x, y) => ({
@@ -157,15 +213,43 @@ export default function GraphVisualizer() {
     const toId = parseInt(addEdgeTo);
     if (isNaN(fromId) || isNaN(toId) || fromId === toId) return;
     
+    // Check if nodes exist
+    const fromNode = nodes.find(n => n.id === fromId);
+    const toNode = nodes.find(n => n.id === toId);
+    if (!fromNode || !toNode) {
+      alert('One or both nodes do not exist!');
+      return;
+    }
+    
+    // Check if edge already exists
     const edgeExists = edges.some(e => 
       (e.from === fromId && e.to === toId) || (e.from === toId && e.to === fromId)
     );
     
-    if (!edgeExists) {
-      const newEdges = [...edges, { from: fromId, to: toId }];
-      setEdges(newEdges);
-      saveToHistory(nodes, newEdges, `Added edge ${fromId} → ${toId}`);
+    if (edgeExists) {
+      alert('Edge already exists!');
+      return;
     }
+    
+    // Check max degree constraint
+    if (enforceMaxDegree && maxDegree) {
+      const maxDeg = parseInt(maxDegree);
+      const fromDegree = getNodeDegree(fromId);
+      const toDegree = getNodeDegree(toId);
+      
+      if (fromDegree >= maxDeg) {
+        alert(`Cannot add edge: Node ${fromId} already has maximum degree of ${maxDeg}`);
+        return;
+      }
+      if (toDegree >= maxDeg) {
+        alert(`Cannot add edge: Node ${toId} already has maximum degree of ${maxDeg}`);
+        return;
+      }
+    }
+    
+    const newEdges = [...edges, { from: fromId, to: toId }];
+    setEdges(newEdges);
+    saveToHistory(nodes, newEdges, `Added edge ${fromId} → ${toId}`);
     setAddEdgeFrom('');
     setAddEdgeTo('');
   };
@@ -275,7 +359,7 @@ export default function GraphVisualizer() {
 
     const newEdges = [...edges];
     const maxPossibleEdges = (nodes.length * (nodes.length - 1)) / 2;
-    const edgesToAdd = Math.min(count, maxPossibleEdges - edges.length);
+    let edgesToAdd = Math.min(count, maxPossibleEdges - edges.length);
 
     if (edgesToAdd <= 0) {
       setAlgorithmInfo('Graph is already complete or too many edges requested');
@@ -283,9 +367,10 @@ export default function GraphVisualizer() {
     }
 
     let attempts = 0;
-    const maxAttempts = edgesToAdd * 10;
+    const maxAttempts = edgesToAdd * 20;
+    let addedCount = 0;
 
-    while (newEdges.length < edges.length + edgesToAdd && attempts < maxAttempts) {
+    while (addedCount < edgesToAdd && attempts < maxAttempts) {
       const fromIndex = Math.floor(Math.random() * nodes.length);
       const toIndex = Math.floor(Math.random() * nodes.length);
       
@@ -298,7 +383,20 @@ export default function GraphVisualizer() {
         );
         
         if (!edgeExists) {
-          newEdges.push({ from: fromId, to: toId });
+          // Check max degree constraint
+          if (enforceMaxDegree && maxDegree) {
+            const maxDeg = parseInt(maxDegree);
+            const fromDegree = newEdges.filter(e => e.from === fromId || e.to === fromId).length;
+            const toDegree = newEdges.filter(e => e.from === toId || e.to === toId).length;
+            
+            if (fromDegree < maxDeg && toDegree < maxDeg) {
+              newEdges.push({ from: fromId, to: toId });
+              addedCount++;
+            }
+          } else {
+            newEdges.push({ from: fromId, to: toId });
+            addedCount++;
+          }
         }
       }
       attempts++;
@@ -306,8 +404,9 @@ export default function GraphVisualizer() {
 
     setEdges(newEdges);
     setAutoEdgeCount('');
-    saveToHistory(nodes, newEdges, `Generated ${newEdges.length - edges.length} random edges`);
-    setAlgorithmInfo(`Added ${newEdges.length - edges.length} random edges`);
+    saveToHistory(nodes, newEdges, `Generated ${addedCount} random edges`);
+    const constraintMsg = enforceMaxDegree ? ` (respecting max degree ${maxDegree})` : '';
+    setAlgorithmInfo(`Added ${addedCount} random edges${constraintMsg}`);
   };
 
   // Create complete graph (all nodes connected to all others)
@@ -315,6 +414,14 @@ export default function GraphVisualizer() {
     if (nodes.length < 2) {
       setAlgorithmInfo('Need at least 2 nodes to create a complete graph');
       return;
+    }
+
+    if (enforceMaxDegree && maxDegree) {
+      const maxDeg = parseInt(maxDegree);
+      if (maxDeg < nodes.length - 1) {
+        alert(`Cannot create complete graph: Maximum degree ${maxDeg} is less than required ${nodes.length - 1}`);
+        return;
+      }
     }
 
     const newEdges = [];
@@ -337,6 +444,14 @@ export default function GraphVisualizer() {
       return;
     }
 
+    if (enforceMaxDegree && maxDegree) {
+      const maxDeg = parseInt(maxDegree);
+      if (maxDeg < 2) {
+        alert(`Cannot create cycle graph: Maximum degree ${maxDeg} is less than required 2`);
+        return;
+      }
+    }
+
     const newEdges = [];
     
     for (let i = 0; i < nodes.length; i++) {
@@ -349,11 +464,20 @@ export default function GraphVisualizer() {
     setAlgorithmInfo(`Created cycle graph with ${newEdges.length} edges`);
   };
 
+
   // Create a star graph (one central node connected to all others)
   const createStarGraph = () => {
     if (nodes.length < 2) {
       setAlgorithmInfo('Need at least 2 nodes to create a star graph');
       return;
+    }
+
+    if (enforceMaxDegree && maxDegree) {
+      const maxDeg = parseInt(maxDegree);
+      if (maxDeg < nodes.length - 1) {
+        alert(`Cannot create star graph: Maximum degree ${maxDeg} is less than required ${nodes.length - 1} for center node`);
+        return;
+      }
     }
 
     const newEdges = [];
@@ -365,7 +489,7 @@ export default function GraphVisualizer() {
 
     setEdges(newEdges);
     saveToHistory(nodes, newEdges, `Created star graph with ${newEdges.length} edges`);
-    setAlgorithmInfo(`Created star graph with ${newEdges.length} edges`);
+    setAlgorithmInfo(`Created star graph with ${newEdges.length} edges (center: node ${centerNode})`);
   };
 
   // Mathematical zoom and pan
@@ -450,12 +574,15 @@ export default function GraphVisualizer() {
     const nodeCount = nodes.length;
     const edgeCount = edges.length;
     const connectedComponents = calculateConnectedComponents();
+    const degrees = getNodeDegrees();
+    const maxCurrentDegree = nodeCount > 0 ? Math.max(...Object.values(degrees)) : 0;
     const averageDegree = edgeCount > 0 ? (2 * edgeCount) / nodeCount : 0;
     
     return {
       nodeCount,
       edgeCount,
       connectedComponents,
+      maxCurrentDegree,
       averageDegree: averageDegree.toFixed(2)
     };
   };
@@ -513,6 +640,10 @@ export default function GraphVisualizer() {
                 <div className="text-2xl font-bold text-purple-600">{graphProps.connectedComponents}</div>
               </div>
               <div className="text-center">
+                <span className="font-semibold text-slate-700">Max Degree:</span>
+                <div className="text-2xl font-bold text-red-600">{graphProps.maxCurrentDegree}</div>
+              </div>
+              <div className="text-center">
                 <span className="font-semibold text-slate-700">Avg Degree:</span>
                 <div className="text-2xl font-bold text-orange-600">{graphProps.averageDegree}</div>
               </div>
@@ -529,6 +660,38 @@ export default function GraphVisualizer() {
             </div>
           </div>
         )}
+
+        {/* Maximum Degree Constraint */}
+        <div className="bg-yellow-50 rounded-lg shadow-lg p-4 mb-6 border border-yellow-200">
+          <div className="flex flex-wrap items-center gap-4">
+            <h3 className="text-lg font-semibold text-slate-800">Maximum Degree Constraint</h3>
+            <div className="flex items-center gap-3">
+              <label className="flex items-center">
+                <input 
+                  type="checkbox" 
+                  checked={enforceMaxDegree}
+                  onChange={(e) => setEnforceMaxDegree(e.target.checked)}
+                  className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <span className="text-sm font-medium text-slate-700">Enforce Max Degree</span>
+              </label>
+              <input 
+                type="number"
+                placeholder="Max degree"
+                value={maxDegree}
+                onChange={(e) => setMaxDegree(e.target.value)}
+                min="1"
+                disabled={!enforceMaxDegree}
+                className="px-3 py-1 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 disabled:bg-gray-100 disabled:text-gray-400"
+              />
+              {enforceMaxDegree && maxDegree && (
+                <span className="text-sm text-slate-600 bg-yellow-100 px-2 py-1 rounded">
+                  Max degree: {maxDegree} (for graph coloring: {parseInt(maxDegree) + 1} colors needed)
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
 
         {/* Control Panel */}
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6 border border-slate-200">
@@ -826,6 +989,15 @@ export default function GraphVisualizer() {
                     />
                     Show Distances
                   </label>
+                  <label className="flex items-center text-sm">
+                    <input 
+                      type="checkbox" 
+                      checked={showDegrees}
+                      onChange={(e) => setShowDegrees(e.target.checked)}
+                      className="mr-2"
+                    />
+                    Show Node Degrees
+                  </label>
                 </div>
               </div>
             </div>
@@ -847,6 +1019,12 @@ export default function GraphVisualizer() {
               <div className="flex items-center gap-2">
                 <span className="font-semibold">Node IDs:</span>
                 <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded">{nodes.map(n => n.id).sort((a, b) => a - b).join(', ')}</span>
+              </div>
+            )}
+            {enforceMaxDegree && maxDegree && (
+              <div className="flex items-center gap-2">
+                <span className="font-semibold">Max Degree Limit:</span>
+                <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded">{maxDegree}</span>
               </div>
             )}
           </div>
@@ -935,7 +1113,8 @@ export default function GraphVisualizer() {
               {nodes.map(n => {
                 const isInPath = currentPath.includes(n.id);
                 const isCurrentStep = isAnimating && n.id === animationPath[animationIndex];
-                
+                const degree = getNodeDegree(n.id);
+                const nodeColor = nodeColors[n.id] || '#E5E7EB';
                 return (
                   <g 
                     key={n.id}
@@ -947,7 +1126,7 @@ export default function GraphVisualizer() {
                       cx={n.x}
                       cy={n.y}
                       r={25}
-                      fill={isCurrentStep ? '#EF4444' : isInPath ? '#7C3AED' : '#E5E7EB'}
+                      fill={isCurrentStep ? '#EF4444' : isInPath ? '#7C3AED' : (enforceMaxDegree ? nodeColor : '#E5E7EB')}
                       stroke={isCurrentStep ? '#DC2626' : isInPath ? '#5B21B6' : '#6B7280'}
                       strokeWidth={isCurrentStep ? 4 : isInPath ? 3 : 2}
                       className="transition-all duration-300 hover:stroke-slate-400"
@@ -959,7 +1138,7 @@ export default function GraphVisualizer() {
                       dy=".3em"
                       fontSize={14}
                       fontWeight="bold"
-                      fill={isCurrentStep ? '#FFFFFF' : isInPath ? '#FFFFFF' : '#374151'}
+                      fill={isCurrentStep || isInPath || (enforceMaxDegree && degree > 0) ? '#FFFFFF' : '#374151'}
                       className="transition-all duration-300 select-none"
                     >
                       {n.id}
@@ -974,6 +1153,19 @@ export default function GraphVisualizer() {
                         className="pointer-events-none"
                       >
                         ({n.x.toFixed(0)}, {n.y.toFixed(0)})
+                      </text>
+                    )}
+                    {showDegrees && (
+                      <text
+                        x={n.x}
+                        y={n.y - 35}
+                        textAnchor="middle"
+                        fontSize={11}
+                        fontWeight="bold"
+                        fill={enforceMaxDegree && maxDegree && degree >= parseInt(maxDegree) ? '#DC2626' : '#059669'}
+                        className="pointer-events-none"
+                      >
+                        deg: {degree}
                       </text>
                     )}
                   </g>
@@ -998,6 +1190,9 @@ export default function GraphVisualizer() {
             <li>• Step through the algorithm with Previous/Next buttons</li>
             <li>• View current graph stats (nodes, edges, node IDs) above the visualization</li>
             <li>• Use "Clear Graph" to start over</li>
+            <li>• <strong>Maximum Degree Constraint:</strong> Enable to limit the number of edges per node (useful for graph coloring algorithms)</li>
+            <li>• When max degree is enforced, nodes are colored by their degree (green → red gradient)</li>
+            <li>• For graph coloring: If max degree is r, you need at most r+1 colors</li>
           </ul>
         </div>
       </div>
