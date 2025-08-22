@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { shortestPath } from '../algorithms/shortestPath';
+import Navbar from '../Components/NavBar';
 
-export default function GraphVisualizer() {
+export default function BFS() {
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
   const [start, setStart] = useState('');
@@ -619,6 +620,8 @@ export default function GraphVisualizer() {
   const graphProps = calculateGraphProperties();
 
   return (
+    <>
+    <Navbar />
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="container mx-auto px-4 py-8">
         {/* Mathematical Header */}
@@ -1197,5 +1200,6 @@ export default function GraphVisualizer() {
         </div>
       </div>
     </div>
+    </>
   );
 }
