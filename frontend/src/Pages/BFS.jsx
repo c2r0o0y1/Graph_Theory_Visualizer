@@ -17,7 +17,7 @@ export default function BFS() {
   const [draggedNode, setDraggedNode] = useState(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
-  // Maximum degree constraint
+  
   const [maxDegree, setMaxDegree] = useState('');
   const [enforceMaxDegree, setEnforceMaxDegree] = useState(false);
   
