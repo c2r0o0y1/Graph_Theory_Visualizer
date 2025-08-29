@@ -169,6 +169,37 @@ export default function HSAlgo() {
     setInfo('Graph cleared');
   };
 
+  // Create the example grid graph
+  const createExampleGraph = () => {
+    const exampleNodes = [
+      // Top row
+      { id: 6, x: 100, y: 100 },
+      { id: 5, x: 200, y: 100 },
+      { id: 4, x: 300, y: 100 },
+      { id: 3, x: 400, y: 100 },
+      { id: 8, x: 500, y: 100 },
+      
+      // Middle row
+      { id: 7, x: 100, y: 200 },
+      { id: 0, x: 200, y: 200 },
+      { id: 1, x: 300, y: 200 },
+      { id: 2, x: 400, y: 200 },
+      
+      // Bottom section
+      { id: 12, x: 100, y: 350 },
+      { id: 13, x: 200, y: 350 },
+      { id: 14, x: 300, y: 350 },
+      { id: 15, x: 450, y: 280 },
+      { id: 11, x: 450, y: 350 },
+      { id: 10, x: 550, y: 350 },
+      { id: 9, x: 550, y: 280 }
+    ];
+
+    setNodes(exampleNodes);
+    saveToHistory(exampleNodes, 'Created example grid graph');
+    setInfo('Loaded example graph with nodes arranged in a grid pattern');
+  };
+
   // Zoom/pan/drag
   const handleZoom = (delta) => {
     setZoom(prev => Math.max(0.3, Math.min(5, prev + delta)));
@@ -407,6 +438,14 @@ export default function HSAlgo() {
                     Redo
                   </button>
                 </div>
+
+                {/* Example Graph */}
+                <button
+                  onClick={createExampleGraph}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors font-semibold"
+                >
+                  Example Graph
+                </button>
 
                 {/* Clear Graph */}
                 <button
