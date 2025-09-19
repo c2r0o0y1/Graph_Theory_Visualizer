@@ -7,6 +7,9 @@ export default function HSAlgo() {
   const [bulkNodeCount, setBulkNodeCount] = useState('');
   const [draggedNode, setDraggedNode] = useState(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [edges, setEdges] = useState([]);
+  const [isSorting, setIsSorting] = useState(false);
+  const [showSortGuide, setShowSortGuide] = useState(false);
 
   // Visualization features (kept)
   const [zoom, setZoom] = useState(1);
@@ -105,6 +108,7 @@ export default function HSAlgo() {
 
     const newNodes = [...nodes, { id, x, y }];
     setNodes(newNodes);
+    setEdges([]);
     saveToHistory(newNodes, `Added node ${id}`);
     setInfo(`Added node ${id}`);
   };
@@ -144,6 +148,7 @@ export default function HSAlgo() {
 
     const finalNodes = [...nodes, ...newNodesToAdd];
     setNodes(finalNodes);
+    setEdges([]); 
     setBulkNodeCount('');
     saveToHistory(finalNodes, `Added ${count} nodes (${startId}-${startId + count - 1})`);
     setInfo(`Added ${count} nodes`);
@@ -154,6 +159,7 @@ export default function HSAlgo() {
     if (isNaN(id)) return;
     const newNodes = nodes.filter(n => n.id !== id);
     setNodes(newNodes);
+    setEdges([]); 
     setDeleteNodeId('');
     saveToHistory(newNodes, `Deleted node ${id}`);
     setInfo(`Deleted node ${id}`);
@@ -166,6 +172,7 @@ export default function HSAlgo() {
     setDraggedNode(null);
     setHistory([]);
     setCurrentStep(0);
+    setEdges([]); 
     setInfo('Graph cleared');
   };
 
@@ -215,11 +222,13 @@ export default function HSAlgo() {
 
   const handlePanStart = (e) => {
     if (e.target.tagName === 'circle') return;
+    if (isSorting) return;
     setIsPanning(true);
     setPanStart({ x: e.clientX, y: e.clientY });
   };
 
   const handleMouseDown = (e, node) => {
+    if (isSorting) return;
     e.preventDefault();
     const rect = e.currentTarget.closest('svg').getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
@@ -280,6 +289,150 @@ export default function HSAlgo() {
     return colorPalette[idx];
   };
 
+
+  const simulateEdges = () => {
+    const r = parseInt(maxDegree, 10);
+    const n = nodes.length;
+
+    if (isNaN(r) || r < 0) {
+      setInfo('Enter a non-negative integer for max degree (r).');
+      return;
+    }
+    if (n < 2) {
+      setInfo('Add at least 2 nodes to create edges.');
+      return;
+    }
+    if (r === 0) {
+      setInfo('Impossible: r = 0 cannot be connected.');
+      setEdges([]);
+      return;
+    }
+    if (r === 1 && n > 2) {
+      setInfo('Impossible: a connected graph with max degree 1 needs n ≤ 2. Increase r to ≥ 2.');
+      setEdges([]);
+      return;
+    }
+
+    const ordered = [...nodes].sort((a, b) => a.id - b.id);
+    const ids = ordered.map(n => n.id);
+
+    const deg = new Map(ids.map(id => [id, 0]));
+    const seen = new Set();
+    const out = [];
+
+    const addEdge = (u, v) => {
+      const a = Math.min(u, v), b = Math.max(u, v);
+      if (a === b) return false;
+      const key = `${a}-${b}`;
+      if (seen.has(key)) return false;
+      if ((deg.get(a) ?? 0) >= r || (deg.get(b) ?? 0) >= r) return false;
+      seen.add(key);
+      out.push({ a, b });
+      deg.set(a, (deg.get(a) ?? 0) + 1);
+      deg.set(b, (deg.get(b) ?? 0) + 1);
+      return true;
+    };
+
+    // 1) Base path to guarantee connectivity (works for r >= 2 or n=2,r=1)
+    for (let i = 0; i < ids.length - 1; i++) {
+      addEdge(ids[i], ids[i + 1]);
+    }
+
+    // 2) Add extra local edges without violating the cap: i -> i+s where s=2..r
+    for (let s = 2; s <= r; s++) {
+      for (let i = 0; i < ids.length; i++) {
+        const j = i + s;
+        if (j >= ids.length) break; // no wrap
+        addEdge(ids[i], ids[j]);
+      }
+    }
+
+    setEdges(out);
+    setInfo(`Built a connected graph with max degree ≤ ${r} (${out.length} edges).`);
+  };
+
+
+  const clearEdges = () => {
+    setEdges([]);
+    setInfo('Cleared all edges.');
+  };
+
+
+
+  // ===== Sort-by-ID (animated, 5 per row with gaps) =====
+  const sortNodesAnimated = () => {
+    if (nodes.length === 0) return;
+
+    // Layout params
+    const cols = 5;              // exactly 5 per row
+    const marginX = 60;          // left/right padding
+    const marginY = 60;          // top/bottom padding
+    const usableW = Math.max(0, width - 2 * marginX);
+    const usableH = Math.max(0, height - 2 * marginY);
+
+    // Order nodes by ID so they appear 1..N left-to-right, top-to-bottom
+    const ordered = [...nodes].sort((a, b) => a.id - b.id);
+    const n = ordered.length;
+    const rows = Math.max(1, Math.ceil(n / cols));
+
+    // Spacing between nodes (gaps) along x and y
+    // If there's only one column/row, avoid division by zero and center vertically/horizontally.
+    const gapX = cols > 1 ? usableW / (cols - 1) : 0;
+    const gapY = rows > 1 ? usableH / (rows - 1) : 0;
+
+    // target map: id -> {x,y} for grid center points
+    const target = new Map();
+    for (let idx = 0; idx < n; idx++) {
+      const row = Math.floor(idx / cols);
+      const col = idx % cols;
+      const x = marginX + col * gapX;
+      const y = marginY + row * gapY;
+      target.set(ordered[idx].id, { x, y });
+    }
+
+    // capture start positions
+    const start = new Map(nodes.map(n => [n.id, { x: n.x, y: n.y }]));
+
+    // animation params
+    const duration = 700; // ms
+    const startTs = performance.now();
+    const easeInOutCubic = (t) =>
+      t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+    setIsSorting(true);
+    setShowSortGuide(true);
+
+    const step = (now) => {
+      const t = Math.min(1, (now - startTs) / duration);
+      const e = easeInOutCubic(t);
+
+      const newNodes = nodes.map(n => {
+        const s = start.get(n.id);
+        const g = target.get(n.id);
+        if (!s || !g) return n;
+        return {
+          ...n,
+          x: s.x + (g.x - s.x) * e,
+          y: s.y + (g.y - s.y) * e
+        };
+      });
+
+      setNodes(newNodes);
+
+      if (t < 1) {
+        requestAnimationFrame(step);
+      } else {
+        setIsSorting(false);
+        setTimeout(() => setShowSortGuide(false), 500);
+        saveToHistory(newNodes, 'Sorted nodes by ID (grid 5-per-row)');
+        setInfo('Nodes sorted by ID into rows of 5.');
+      }
+    };
+
+    requestAnimationFrame(step);
+  };
+
+
   return (
     <>
       <Navbar />
@@ -294,6 +447,10 @@ export default function HSAlgo() {
                 <div className="text-center">
                   <span className="font-semibold text-slate-700">Nodes:</span>
                   <div className="text-2xl font-bold text-blue-600">{nodes.length}</div>
+                </div>
+                <div className="text-center">
+                  <span className="font-semibold text-slate-700">Edges:</span>
+                  <div className="text-2xl font-bold text-emerald-600">{edges.length}</div>
                 </div>
                 <div className="text-center col-span-1 sm:col-span-2">
                   <span className="font-semibold text-slate-700">Node IDs:</span>
@@ -354,6 +511,30 @@ export default function HSAlgo() {
                     ))}
                 </div>
                 )}
+                {/* NEW: Edge Simulation Controls */}
+                <div className="w-full mt-3 flex flex-wrap gap-2">
+                  <button
+                    onClick={sortNodesAnimated}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                  >
+                    Sort by ID (animate)
+                  </button>
+                  <button
+                    onClick={simulateEdges}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                  >
+                    Simulate Edges
+                  </button>
+                  <button
+                    onClick={clearEdges}
+                    className="bg-slate-600 hover:bg-slate-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                  >
+                    Clear Edges
+                  </button>
+                  <span className="text-xs text-slate-600 self-center">
+                    Pattern: i → (i+1..i+r), undirected (no wrap). With k=r+1 colors, neighbors differ.
+                  </span>
+                </div>
             </div>
         </div>
 
@@ -497,6 +678,46 @@ export default function HSAlgo() {
                   cursor: isPanning ? 'grabbing' : 'grab'
                 }}
               >
+                {showSortGuide && (() => {
+                  const ordered = [...nodes].sort((a, b) => a.id - b.id);
+                  const marginX = 60;
+                  const y = height / 2;
+                  const n = ordered.length;
+                  const spacing = n > 1 ? (width - 2 * marginX) / (n - 1) : 0;
+                  return (
+                    <g opacity={0.5}>
+                      <line x1={marginX} y1={y} x2={width - marginX} y2={y} stroke="#a78bfa" strokeWidth={3} strokeDasharray="6 6" />
+                      {ordered.map((nd, idx) => {
+                        const x = marginX + idx * spacing;
+                        return (
+                          <g key={`tick-${nd.id}`} transform={`translate(${x},${y})`}>
+                            <circle r={6} fill="#a78bfa" />
+                            <text y={-12} textAnchor="middle" fontSize={11} fill="#6b21a8" fontWeight="600">{nd.id}</text>
+                          </g>
+                        );
+                      })}
+                    </g>
+                  );
+                })()}
+                {/* NEW: Edges (render behind nodes) */}
+                {edges.map(({ a, b }) => {
+                  const na = nodes.find(n => n.id === a);
+                  const nb = nodes.find(n => n.id === b);
+                  if (!na || !nb) return null;
+                  return (
+                    <line
+                      key={`${a}-${b}`}
+                      x1={na.x}
+                      y1={na.y}
+                      x2={nb.x}
+                      y2={nb.y}
+                      stroke="#94a3b8"
+                      strokeWidth={2}
+                      opacity={0.9}
+                    />
+                  );
+                })}
+
                 {/* Nodes */}
                 {nodes.map(n => (
                   <g
