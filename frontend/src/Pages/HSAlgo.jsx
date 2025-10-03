@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo, useEffect } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import Navbar from '../Components/NavBar';
 
 export default function HSAlgo() {
@@ -95,8 +95,10 @@ export default function HSAlgo() {
     const maxAttempts = 100;
 
     do {
-      x = Math.random() * (width - 80) + 40;
-      y = Math.random() * (height - 80) + 40;
+      const newX = Math.random() * (width - 80) + 40;
+      const newY = Math.random() * (height - 80) + 40;
+      x = newX;
+      y = newY;
       attempts++;
     } while (
       attempts < maxAttempts &&
@@ -132,8 +134,10 @@ export default function HSAlgo() {
       const maxAttempts = 200;
 
       do {
-        x = Math.random() * (width - 80) + 40;
-        y = Math.random() * (height - 80) + 40;
+        const newX = Math.random() * (width - 80) + 40;
+        const newY = Math.random() * (height - 80) + 40;
+        x = newX;
+        y = newY;
         attempts++;
       } while (
         attempts < maxAttempts &&
@@ -436,47 +440,69 @@ export default function HSAlgo() {
   return (
     <>
       <Navbar />
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50">
         <div className="container mx-auto px-4 py-8">
           {/* Header */}
-          <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-slate-800 mb-2">Graph Visualizer (Nodes Only)</h1>
-            <p className="text-slate-600 text-lg">Add, move, and manage nodes. Edges/features removed.</p>
-            <div className="mt-4 p-3 bg-white rounded-lg shadow-sm border border-slate-200">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
-                <div className="text-center">
-                  <span className="font-semibold text-slate-700">Nodes:</span>
-                  <div className="text-2xl font-bold text-blue-600">{nodes.length}</div>
+          <div className="text-center mb-8 animate-fade-in-up">
+            <div className="mb-4">
+              <h1 className="text-5xl font-bold bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-800 bg-clip-text text-transparent mb-2">
+                Graph Coloring Visualizer
+              </h1>
+              <p className="text-slate-600 text-xl font-medium animate-slide-in-right">Interactive Graph Theory Learning Tool</p>
+              <p className="text-slate-500 text-sm mt-2">Explore graph coloring algorithms with maximum degree constraints</p>
+            </div>
+            <div className="mt-6 p-6 bg-white rounded-xl shadow-lg border border-slate-200 backdrop-blur-sm bg-white/80 animate-fade-in-up">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-6 text-sm">
+                <div className="text-center group">
+                  <div className="p-3 rounded-lg bg-gradient-to-br from-blue-50 to-blue-100 group-hover:from-blue-100 group-hover:to-blue-200 transition-all duration-200">
+                    <span className="block font-medium text-slate-700 mb-1">Nodes</span>
+                    <div className="text-3xl font-bold text-blue-600">{nodes.length}</div>
+                  </div>
                 </div>
-                <div className="text-center">
-                  <span className="font-semibold text-slate-700">Edges:</span>
-                  <div className="text-2xl font-bold text-emerald-600">{edges.length}</div>
+                <div className="text-center group">
+                  <div className="p-3 rounded-lg bg-gradient-to-br from-emerald-50 to-emerald-100 group-hover:from-emerald-100 group-hover:to-emerald-200 transition-all duration-200">
+                    <span className="block font-medium text-slate-700 mb-1">Edges</span>
+                    <div className="text-3xl font-bold text-emerald-600">{edges.length}</div>
+                  </div>
                 </div>
-                <div className="text-center col-span-1 sm:col-span-2">
-                  <span className="font-semibold text-slate-700">Node IDs:</span>
-                  <div className="text-sm text-slate-600 truncate">
-                    {nodeIds.length ? nodeIds.join(', ') : '—'}
+                <div className="text-center group col-span-2 sm:col-span-1">
+                  <div className="p-3 rounded-lg bg-gradient-to-br from-purple-50 to-purple-100 group-hover:from-purple-100 group-hover:to-purple-200 transition-all duration-200">
+                    <span className="block font-medium text-slate-700 mb-1">Colors</span>
+                    <div className="text-3xl font-bold text-purple-600">{colorPalette.length}</div>
                   </div>
                 </div>
               </div>
+              {nodeIds.length > 0 && (
+                <div className="mt-4 p-3 bg-slate-50 rounded-lg">
+                  <span className="block text-sm font-medium text-slate-700 mb-1">Node IDs:</span>
+                  <div className="text-sm text-slate-600 font-mono">
+                    {nodeIds.join(', ')}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Info banner */}
           {info && (
-            <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="mb-6 bg-gradient-to-r from-blue-50 to-emerald-50 border border-blue-200 rounded-xl p-4 shadow-sm animate-slide-in-right">
               <div className="flex items-center">
-                <div className="w-2 h-2 bg-blue-500 rounded-full mr-3 animate-pulse"></div>
-                <span className="text-blue-800 font-medium">{info}</span>
+                <div className="w-3 h-3 bg-gradient-to-r from-blue-500 to-emerald-500 rounded-full mr-3 animate-pulse-slow shadow-sm"></div>
+                <span className="text-blue-800 font-medium text-sm">{info}</span>
               </div>
             </div>
           )}
 
 
           {/* Maximum Degree Constraint */}
-          <div className="bg-yellow-50 rounded-lg shadow-lg p-4 mb-6 border border-yellow-200">
+          <div className="bg-gradient-to-r from-yellow-50 to-amber-50 rounded-xl shadow-lg p-6 mb-8 border border-yellow-200">
             <div className="flex flex-wrap items-center gap-4">
-                <h3 className="text-lg font-semibold text-slate-800">Maximum Degree Constraint</h3>
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+                </svg>
+                <h3 className="text-lg font-semibold text-slate-800">Graph Coloring Algorithm</h3>
+              </div>
                 <div className="flex items-center gap-3">
                 <label className="flex items-center">
                     <input
@@ -539,11 +565,16 @@ export default function HSAlgo() {
         </div>
 
           {/* Control Panel */}
-          <div className="bg-white rounded-lg shadow-lg p-6 mb-6 border border-slate-200">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-xl p-8 mb-8 border border-slate-200">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* Node Operations */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-slate-800 border-b border-slate-300 pb-2">Node Operations</h3>
+              <div className="space-y-6">
+                <div className="flex items-center gap-2 pb-3 border-b-2 border-blue-200">
+                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                  </svg>
+                  <h3 className="text-lg font-bold text-slate-800">Node Operations</h3>
+                </div>
 
                 {/* Single Node */}
                 <button
@@ -599,8 +630,14 @@ export default function HSAlgo() {
               </div>
 
               {/* Tools */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-slate-800 border-b border-slate-300 pb-2">Tools</h3>
+              <div className="space-y-6">
+                <div className="flex items-center gap-2 pb-3 border-b-2 border-emerald-200">
+                  <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  <h3 className="text-lg font-bold text-slate-800">Tools</h3>
+                </div>
 
                 {/* Undo/Redo */}
                 <div className="grid grid-cols-2 gap-2">
@@ -651,9 +688,9 @@ export default function HSAlgo() {
           </div>
 
           {/* Graph Visualization */}
-          <div className="bg-white rounded-lg shadow-lg p-6 border border-slate-200">
+          <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-xl p-8 border border-slate-200">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
-              <h3 className="text-lg font-semibold text-slate-800">Graph Visualization</h3>
+              <h3 className="text-lg font-bold text-slate-800">Graph Visualization</h3>
               <div className="text-sm text-slate-500">
                 Zoom: ×{zoom.toFixed(1)} | Mouse wheel to zoom
               </div>
@@ -764,17 +801,13 @@ export default function HSAlgo() {
             </div>
           </div>
 
-          {/* Instructions (nodes-only) */}
-          <div className="mt-6 bg-slate-50 rounded-lg p-4 border border-slate-200">
-            <h4 className="font-semibold text-slate-800 mb-2">Instructions:</h4>
-            <ul className="text-sm text-slate-600 space-y-1">
-              <li>• Add single nodes or multiple nodes at once (1–50).</li>
-              <li>• Drag nodes to reposition them (snap-limited to canvas bounds).</li>
-              <li>• Use mouse wheel to zoom; drag the background to pan.</li>
-              <li>• Use Undo/Redo to step through changes.</li>
-              <li>• Use “Clear Graph” to start over.</li>
-            </ul>
-          </div>
+           {/* Quick Guide */}
+           <div className="mt-8 bg-gradient-to-r from-slate-50 to-emerald-50 rounded-xl p-4 border border-slate-200 shadow-sm">
+             <div className="flex items-center justify-between text-sm text-slate-600">
+               <span>🖱️ <strong>Drag</strong> nodes • <strong>Scroll</strong> to zoom • <strong>Drag background</strong> to pan</span>
+               <span>🎨 <strong>Add nodes</strong> → <strong>Set max degree</strong> → <strong>Visualize colors</strong></span>
+             </div>
+           </div>
         </div>
       </div>
     </>

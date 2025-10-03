@@ -13,25 +13,44 @@ export default function Navbar() {
     ].join(' ');
 
   return (
-    <header className="sticky top-0 z-50 bg-white/80 backdrop-blur border-b border-slate-200">
+    <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm">
       <nav className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-14">
+        <div className="flex items-center justify-between h-16">
           {/* Brand */}
-          <div className="flex items-center gap-2">
-            <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-blue-600 text-white font-bold">G</span>
-            <span className="text-slate-800 font-semibold">Graph Visualizer</span>
+          <div className="flex items-center gap-3">
+            <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 text-white font-bold shadow-md">
+              G
+            </div>
+            <div className="flex flex-col">
+              <span className="text-slate-800 font-bold text-lg leading-tight">Graph Visualizer</span>
+              <span className="text-xs text-slate-500 leading-tight">Interactive Learning Tool</span>
+            </div>
           </div>
 
           {/* Desktop links */}
-          <div className="hidden md:flex items-center gap-2">
-            <NavLink to="/bfs" className={linkStyles}>Bfs</NavLink>
-            <NavLink to="/hs-algo" className={linkStyles}>HS ALGO</NavLink>
+          <div className="hidden md:flex items-center gap-1">
+            <NavLink to="/bfs" className={linkStyles}>
+              <span className="flex items-center gap-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                BFS Algorithm
+              </span>
+            </NavLink>
+            <NavLink to="/hs-algo" className={linkStyles}>
+              <span className="flex items-center gap-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zM21 5a2 2 0 00-2-2h-4a2 2 0 00-2 2v12a4 4 0 004 4h4a2 2 0 002-2V5z" />
+                </svg>
+                Graph Coloring
+              </span>
+            </NavLink>
           </div>
 
           {/* Mobile toggle */}
           <button
             type="button"
-            className="md:hidden inline-flex items-center justify-center p-2 rounded-md text-slate-600 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="md:hidden inline-flex items-center justify-center p-2.5 rounded-lg text-slate-600 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
             aria-controls="primary-nav"
             aria-expanded={open}
             onClick={() => setOpen(v => !v)}
@@ -48,10 +67,24 @@ export default function Navbar() {
         </div>
 
         {/* Mobile menu */}
-        <div id="primary-nav" className={`${open ? 'block' : 'hidden'} md:hidden pb-3`}>
-          <div className="flex flex-col gap-2">
-            <NavLink to="/bfs" className={linkStyles} onClick={() => setOpen(false)}>Bfs</NavLink>
-            <NavLink to="/hs-algo" className={linkStyles} onClick={() => setOpen(false)}>HS ALGO</NavLink>
+        <div id="primary-nav" className={`${open ? 'block' : 'hidden'} md:hidden pb-4 pt-2`}>
+          <div className="flex flex-col gap-1 bg-slate-50 rounded-lg p-2">
+            <NavLink to="/bfs" className={linkStyles} onClick={() => setOpen(false)}>
+              <span className="flex items-center gap-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                BFS Algorithm
+              </span>
+            </NavLink>
+            <NavLink to="/hs-algo" className={linkStyles} onClick={() => setOpen(false)}>
+              <span className="flex items-center gap-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zM21 5a2 2 0 00-2-2h-4a2 2 0 00-2 2v12a4 4 0 004 4h4a2 2 0 002-2V5z" />
+                </svg>
+                Graph Coloring
+              </span>
+            </NavLink>
           </div>
         </div>
       </nav>
