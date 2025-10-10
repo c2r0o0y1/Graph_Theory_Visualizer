@@ -8,6 +8,7 @@ export default function HSAlgo() {
   const [draggedNode, setDraggedNode] = useState(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [edges, setEdges] = useState([]);
+  const [bulkEdgesText, setBulkEdgesText] = useState('');
   const [isSorting, setIsSorting] = useState(false);
   const [showSortGuide, setShowSortGuide] = useState(false);
 
@@ -32,6 +33,48 @@ export default function HSAlgo() {
   const height = 500;
   const svgRef = useRef(null);
 
+  //helper fns
+  const normalizeEdge = (u, v) => {
+    const a = Math.min(u, v), b = Math.max(u, v);
+    return `${a}-${b}`;
+  };
+
+
+  const buildAddEdgeFn = (r, ids) => {
+    const deg = new Map(ids.map(id => [id, 0]));
+    const seen = new Set();
+    const out = [];
+
+    const addEdge = (u, v) => {
+      if (u === v) return false;
+      const key = normalizeEdge(u, v);
+      if (seen.has(key)) return false;
+      if ((deg.get(u) ?? 0) >= r || (deg.get(v) ?? 0) >= r) return false;
+      seen.add(key);
+      out.push({ a: Math.min(u, v), b: Math.max(u, v) });
+      deg.set(u, (deg.get(u) ?? 0) + 1);
+      deg.set(v, (deg.get(v) ?? 0) + 1);
+      return true;
+    };
+
+    return { addEdge, out, deg, seen };
+  };
+
+  //leetcode style edge i/o
+  const parseBulkEdges = (text) => {
+    return text
+      .split(/[,\n]+/)
+      .map(s => s.trim())
+      .filter(Boolean)
+      .map(pair => {
+        const m = pair.match(/^(\d+)\s*[-:]\s*(\d+)$/);
+        if (!m) throw new Error(`Invalid pair: "${pair}" (use "u-v")`);
+        return [parseInt(m[1], 10), parseInt(m[2], 10)];
+      });
+  };
+
+
+  //---------------------------------------------------------------------------
 
   const colorPalette = useMemo(() => {
     const rInt = parseInt(maxDegree, 10);
@@ -181,6 +224,7 @@ export default function HSAlgo() {
   };
 
   // Create the example grid graph
+  //why do we need this?
   const createExampleGraph = () => {
     const exampleNodes = [
       // Top row
@@ -354,6 +398,175 @@ export default function HSAlgo() {
     setEdges(out);
     setInfo(`Built a connected graph with max degree ≤ ${r} (${out.length} edges).`);
   };
+
+
+
+  const applyBulkEdgesFromText = () => {
+    const r = parseInt(maxDegree, 10);
+    if (isNaN(r) || r < 0) {
+      alert('Enter a non-negative integer for max degree (r).');
+      return;
+    }
+    if (nodes.length < 2) {
+      alert('Add at least 2 nodes before adding edges.');
+      return;
+    }
+    if (!bulkEdgesText.trim()) {
+      alert('Paste edges like: 1-2, 2-3, 5-1');
+      return;
+    }
+  
+    // Known node IDs
+    const ids = new Set(nodes.map(n => n.id));
+  
+    let pairs;
+    try {
+      pairs = parseBulkEdges(bulkEdgesText);
+    } catch (e) {
+      alert(e.message);
+      return;
+    }
+  
+    // Validate node existence and duplicates/self-loops
+    const unique = new Set();
+    for (const [u, v] of pairs) {
+      if (!ids.has(u) || !ids.has(v)) {
+        alert(`Edge uses unknown node: ${u}-${v}`);
+        return;
+      }
+      if (u === v) {
+        alert(`Self-loop not allowed: ${u}-${v}`);
+        return;
+      }
+      const key = normalizeEdge(u, v);
+      if (unique.has(key)) continue;
+      unique.add(key);
+    }
+  
+    // Degree accounting
+    const deg = new Map([...ids].map(id => [id, 0]));
+    for (const key of unique) {
+      const [a, b] = key.split('-').map(Number);
+      deg.set(a, deg.get(a) + 1);
+      deg.set(b, deg.get(b) + 1);
+    }
+  
+    // Check constraints
+    for (const id of ids) {
+      const d = deg.get(id) ?? 0;
+      if (d === 0) {
+        alert(`Every node must have at least one edge. Node ${id} has 0.`);
+        return;
+      }
+      if (r >= 0 && d > r) {
+        alert(`Max degree r=${r} violated at node ${id} (deg=${d}).`);
+        return;
+      }
+    }
+  
+    // All good → apply
+    const out = [...unique].map(key => {
+      const [a, b] = key.split('-').map(Number);
+      return { a, b };
+    });
+  
+    setEdges(out);
+    saveToHistory(nodes, 'Applied bulk predefined edges');
+    setInfo(`Applied ${out.length} predefined edges.`);
+  };
+
+  const buildConflictProneEdges = () => {
+    const r = parseInt(maxDegree, 10);
+    const n = nodes.length;
+  
+    if (!enforceMaxDegree) {
+      alert('Enable "Enforce Max Degree" and set r first.');
+      return;
+    }
+    if (isNaN(r) || r < 1) {
+      alert('Enter r >= 1 to build conflict-prone edges.');
+      return;
+    }
+    if (n < 2) {
+      alert('Add at least 2 nodes.');
+      return;
+    }
+  
+    const ordered = [...nodes].sort((a, b) => a.id - b.id);
+    const ids = ordered.map(n => n.id);
+    const { addEdge, out, deg, seen } = buildAddEdgeFn(r, ids);
+  
+    const k = r + 1;
+  
+    // Group IDs by color class
+    const groups = Array.from({ length: k }, () => []);
+    for (const id of ids) {
+      const cls = (id - 1) % k;
+      groups[cls].push(id);
+    }
+  
+    // 1) Inside each color class, make a simple chain (same-color adjacency).
+    for (const g of groups) {
+      for (let i = 0; i + 1 < g.length; i++) {
+        addEdge(g[i], g[i + 1]);
+      }
+    }
+  
+    // 2) Ensure each node has at least degree 1.
+    // Try to add another same-class neighbor if available; fallback to nearby different classes.
+    const idSet = new Set(ids);
+    for (const id of ids) {
+      if ((deg.get(id) ?? 0) >= 1) continue;
+  
+      const cls = (id - 1) % k;
+      const poolSame = groups[cls].filter(v => v !== id);
+      let placed = false;
+  
+      // Prefer same-class partner
+      for (const v of poolSame) {
+        if (addEdge(id, v)) { placed = true; break; }
+      }
+  
+      // Fallback: close-by IDs to avoid full connectivity growth
+      if (!placed) {
+        const tryNeighbors = [
+          ids.find(v => v > id),      // next id
+          ids.findLast(v => v < id),  // previous id
+        ].filter(Boolean);
+        for (const v of tryNeighbors) {
+          if (addEdge(id, v)) { placed = true; break; }
+        }
+      }
+  
+      if (!placed) {
+        alert(`Could not give node ${id} at least one edge under r=${r}. Try increasing r.`);
+        return;
+      }
+    }
+  
+    // 3) Lightly densify *within* color classes up to degree limits,
+    // but stop early to avoid anything close to complete subgraphs.
+    for (const g of groups) {
+      // Shuffle-ish pass without random (pair every second node)
+      for (let i = 0; i + 2 < g.length; i++) {
+        if ((deg.get(g[i]) ?? 0) < r && (deg.get(g[i + 2]) ?? 0) < r) {
+          addEdge(g[i], g[i + 2]);
+        }
+      }
+    }
+  
+    // 4) Optional gentle cross-class sprinkle (keeps graph from isolating color classes)
+    // but keep it sparse (only try neighbors by index).
+    for (let i = 0; i < ids.length - 1; i++) {
+      const u = ids[i], v = ids[i + 1];
+      addEdge(u, v);
+    }
+  
+    setEdges(out);
+    saveToHistory(nodes, 'Built conflict-prone edges');
+    setInfo(`Built ${out.length} conflict-prone edges (same-color tendency, degree ≤ ${r}).`);
+  };
+  
 
 
   const clearEdges = () => {
@@ -538,7 +751,7 @@ export default function HSAlgo() {
                 </div>
                 )}
                 {/* NEW: Edge Simulation Controls */}
-                <div className="w-full mt-3 flex flex-wrap gap-2">
+                {/*<div className="w-full mt-3 flex flex-wrap gap-2">
                   <button
                     onClick={sortNodesAnimated}
                     className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
@@ -560,7 +773,67 @@ export default function HSAlgo() {
                   <span className="text-xs text-slate-600 self-center">
                     Pattern: i → (i+1..i+r), undirected (no wrap). With k=r+1 colors, neighbors differ.
                   </span>
+                </div>*/}
+
+                <div className="w-full mt-3 flex flex-wrap gap-2">
+                  <button
+                    onClick={sortNodesAnimated}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                  >
+                    Sort by ID (animate)
+                  </button>
+
+                  {/*<button
+                    onClick={simulateEdges}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                  >
+                    Simulate Edges (balanced)
+                  </button>
+
+                  <button
+                    onClick={buildConflictProneEdges}
+                    className="bg-amber-600 hover:bg-amber-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                    title="Favor edges within the same color class, respect r, avoid complete graphs"
+                  >
+                    Conflict-Prone Edges
+                  </button>
+
+                  <button
+                    onClick={clearEdges}
+                    className="bg-slate-600 hover:bg-slate-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                  >
+                    Clear Edges
+                  </button>
+
+                  <span className="text-xs text-slate-600 self-center">
+                    Balanced: i→(i+1..i+r). Conflict-prone: favors same color class.
+                  </span>*/}
                 </div>
+
+                {/* Bulk predefined edges */}
+                {/*<div className="w-full mt-3">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Bulk predefined edges (format: <code>1-2, 2-3, 5-1</code> or line-separated)
+                  </label>
+                  <textarea
+                    value={bulkEdgesText}
+                    onChange={(e) => setBulkEdgesText(e.target.value)}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    placeholder="1-2, 2-3, 5-1"
+                  />
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      onClick={applyBulkEdgesFromText}
+                      className="bg-amber-600 hover:bg-amber-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                    >
+                      Apply Bulk Edges
+                    </button>
+                    <span className="text-xs text-slate-600 self-center">
+                      Requires r. Every node must have ≥1 edge and ≤r.
+                    </span>
+                  </div>
+                </div>*/}
             </div>
         </div>
 
@@ -683,7 +956,62 @@ export default function HSAlgo() {
               </div>
 
               {/* Empty third column for symmetry / future controls */}
-              <div className="hidden lg:block" />
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 pb-3 border-b-2 border-amber-200">
+                  <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7h16M4 12h10M4 17h7" />
+                  </svg>
+                  <h3 className="text-lg font-bold text-slate-800">Edge Operations</h3>
+                </div>
+
+                <div className="w-full">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Bulk predefined edges (e.g. <code>1-2, 2-3, 5-1</code> or line-separated)
+                  </label>
+                  <textarea
+                    value={bulkEdgesText}
+                    onChange={(e) => setBulkEdgesText(e.target.value)}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    placeholder="1-2, 2-3, 5-1"
+                  />
+                  <div className="mt-2 flex items-center gap-2">
+                    <button
+                      onClick={applyBulkEdgesFromText}
+                      className="bg-amber-600 hover:bg-amber-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                    >
+                      Apply Bulk Edges
+                    </button>
+                    <span className="text-xs text-slate-600">
+                      Requires r. Every node must have ≥1 edge and ≤ r.
+                    </span>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {/* <button
+                    onClick={simulateEdges}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                    title="Balanced pattern: i → (i+1..i+r), undirected (no wrap)"
+                  >
+                    Simulate Edges (balanced)
+                  </button> */}
+
+                  <button
+                    onClick={buildConflictProneEdges}
+                    className="bg-amber-600 hover:bg-amber-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                    title="Favor same-color adjacency, respect r, avoid complete graphs"
+                  >
+                    Conflict-Prone Edges
+                  </button>
+
+                  <button
+                    onClick={clearEdges}
+                    className="bg-slate-600 hover:bg-slate-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                  >
+                    Clear Edges
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
