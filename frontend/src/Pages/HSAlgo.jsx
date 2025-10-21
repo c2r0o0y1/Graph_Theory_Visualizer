@@ -494,77 +494,82 @@ export default function HSAlgo() {
   
     const ordered = [...nodes].sort((a, b) => a.id - b.id);
     const ids = ordered.map(n => n.id);
-    const { addEdge, out, deg, seen } = buildAddEdgeFn(r, ids);
+    const { addEdge, out, deg } = buildAddEdgeFn(r, ids);
   
-    const k = r + 1;
+    const k = r + 1; // number of color classes
+    const clsOf = (id) => (id - 1) % k;
   
-    // Group IDs by color class
+    // Group ids by color class
     const groups = Array.from({ length: k }, () => []);
-    for (const id of ids) {
-      const cls = (id - 1) % k;
-      groups[cls].push(id);
-    }
+    for (const id of ids) groups[clsOf(id)].push(id);
   
-    // 1) Inside each color class, make a simple chain (same-color adjacency).
+    // STEP 1: Within-class simple chains only (NO cross-class edges here)
     for (const g of groups) {
       for (let i = 0; i + 1 < g.length; i++) {
-        addEdge(g[i], g[i + 1]);
+        addEdge(g[i], g[i + 1]); // addEdge respects r; if too tight, link is skipped
       }
     }
   
-    // 2) Ensure each node has at least degree 1.
-    // Try to add another same-class neighbor if available; fallback to nearby different classes.
-    const idSet = new Set(ids);
-    for (const id of ids) {
-      if ((deg.get(id) ?? 0) >= 1) continue;
+    // Helper: pick lowest-degree available node from a class
+    const pickFromClass = (c) => {
+      const avail = groups[c].filter(u => (deg.get(u) ?? 0) < r);
+      if (avail.length === 0) return null;
+      // lowest degree first; stable by id
+      avail.sort((a, b) => {
+        const da = deg.get(a) ?? 0, db = deg.get(b) ?? 0;
+        return da - db || a - b;
+      });
+      return avail[0];
+    };
   
-      const cls = (id - 1) % k;
-      const poolSame = groups[cls].filter(v => v !== id);
-      let placed = false;
+    // STEP 4: EXACTLY ONE CROSS-CLASS EDGE PER CLASS PAIR
+    for (let c1 = 0; c1 < k; c1++) {
+      for (let c2 = c1 + 1; c2 < k; c2++) {
+        // If a class is empty, skip this pair gracefully
+        if (groups[c1].length === 0 || groups[c2].length === 0) continue;
   
-      // Prefer same-class partner
-      for (const v of poolSame) {
-        if (addEdge(id, v)) { placed = true; break; }
-      }
+        let u = pickFromClass(c1);
+        let v = pickFromClass(c2);
   
-      // Fallback: close-by IDs to avoid full connectivity growth
-      if (!placed) {
-        const tryNeighbors = [
-          ids.find(v => v > id),      // next id
-          ids.findLast(v => v < id),  // previous id
-        ].filter(Boolean);
-        for (const v of tryNeighbors) {
-          if (addEdge(id, v)) { placed = true; break; }
+        // Try to rotate once if top candidate becomes unavailable due to addEdge ordering
+        if (u == null || v == null) {
+          alert(
+            `Cannot place the required single cross-class edge between classes ${c1} and ${c2} without exceeding r=${r}.`
+          );
+          return;
+        }
+  
+        if (!addEdge(u, v)) {
+          // Retry with next best candidates (simple fallback within class)
+          const cand1 = groups[c1]
+            .filter(x => (deg.get(x) ?? 0) < r)
+            .sort((a, b) => (deg.get(a) ?? 0) - (deg.get(b) ?? 0) || a - b);
+          const cand2 = groups[c2]
+            .filter(x => (deg.get(x) ?? 0) < r)
+            .sort((a, b) => (deg.get(a) ?? 0) - (deg.get(b) ?? 0) || a - b);
+  
+          let placed = false;
+          for (const x of cand1) {
+            if (placed) break;
+            for (const y of cand2) {
+              if (addEdge(x, y)) { placed = true; break; }
+            }
+          }
+          if (!placed) {
+            alert(
+              `Unable to place the single cross-class edge between classes ${c1} and ${c2} within degree cap r=${r}.`
+            );
+            return;
+          }
         }
       }
-  
-      if (!placed) {
-        alert(`Could not give node ${id} at least one edge under r=${r}. Try increasing r.`);
-        return;
-      }
-    }
-  
-    // 3) Lightly densify *within* color classes up to degree limits,
-    // but stop early to avoid anything close to complete subgraphs.
-    for (const g of groups) {
-      // Shuffle-ish pass without random (pair every second node)
-      for (let i = 0; i + 2 < g.length; i++) {
-        if ((deg.get(g[i]) ?? 0) < r && (deg.get(g[i + 2]) ?? 0) < r) {
-          addEdge(g[i], g[i + 2]);
-        }
-      }
-    }
-  
-    // 4) Optional gentle cross-class sprinkle (keeps graph from isolating color classes)
-    // but keep it sparse (only try neighbors by index).
-    for (let i = 0; i < ids.length - 1; i++) {
-      const u = ids[i], v = ids[i + 1];
-      addEdge(u, v);
     }
   
     setEdges(out);
-    saveToHistory(nodes, 'Built conflict-prone edges');
-    setInfo(`Built ${out.length} conflict-prone edges (same-color tendency, degree ≤ ${r}).`);
+    saveToHistory(nodes, 'Conflict edges: within-class chains + exactly one edge per class pair');
+    setInfo(
+      `Built ${out.length} edges: within-class chains; exactly one edge for each pair of color classes; degree ≤ ${r}.`
+    );
   };
   
 
