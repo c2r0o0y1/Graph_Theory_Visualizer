@@ -1165,6 +1165,100 @@ export default function HSAlgo() {
     requestAnimationFrame(step);
   };
 
+  // Group nodes by color classes
+  const groupByColorClasses = () => {
+    if (nodes.length === 0) return;
+    if (!k || k === 0) {
+      setInfo('Enable "Enforce Max Degree" and set max degree to group by color classes.');
+      return;
+    }
+
+    const marginX = 60;
+    const marginY = 60;
+    const usableW = Math.max(0, width - 2 * marginX);
+    const usableH = Math.max(0, height - 2 * marginY);
+
+    // Group nodes by their color class
+    const nodesByClass = new Map();
+    for (let i = 0; i < k; i++) {
+      nodesByClass.set(i, []);
+    }
+
+    nodes.forEach(n => {
+      const c = coloring[n.id];
+      if (c != null && c >= 0 && c < k) {
+        nodesByClass.get(c).push(n);
+      } else {
+        // Fallback: assign to class 0 if no color assigned
+        nodesByClass.get(0).push(n);
+      }
+    });
+
+    // Sort nodes within each class by ID for consistency
+    nodesByClass.forEach((nodeList, classIdx) => {
+      nodeList.sort((a, b) => a.id - b.id);
+    });
+
+    // Arrange nodes: each color class gets its own column
+    const cols = k;
+    const gapX = cols > 1 ? usableW / (cols - 1) : 0;
+
+    const target = new Map();
+    let maxNodesInClass = 0;
+    nodesByClass.forEach((nodeList) => {
+      maxNodesInClass = Math.max(maxNodesInClass, nodeList.length);
+    });
+
+    nodesByClass.forEach((nodeList, classIdx) => {
+      const x = marginX + classIdx * gapX;
+      const rows = Math.max(1, nodeList.length);
+      const gapY = rows > 1 ? usableH / (rows - 1) : 0;
+
+      nodeList.forEach((node, idx) => {
+        const y = marginY + idx * gapY;
+        target.set(node.id, { x, y });
+      });
+    });
+
+    const start = new Map(nodes.map(n => [n.id, { x: n.x, y: n.y }]));
+    const duration = 700; // ms
+    const startTs = performance.now();
+    const easeInOutCubic = (t) =>
+      t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+    setIsSorting(true);
+    setShowSortGuide(true);
+
+    const step = (now) => {
+      const t = Math.min(1, (now - startTs) / duration);
+      const e = easeInOutCubic(t);
+
+      const newNodes = nodes.map(n => {
+        const s = start.get(n.id);
+        const g = target.get(n.id);
+        if (!s || !g) return n;
+        return {
+          ...n,
+          x: s.x + (g.x - s.x) * e,
+          y: s.y + (g.y - s.y) * e
+        };
+      });
+
+      setNodes(newNodes);
+
+      if (t < 1) {
+        requestAnimationFrame(step);
+      } else {
+        setIsSorting(false);
+        setTimeout(() => setShowSortGuide(false), 500);
+        saveToHistory(newNodes, 'Grouped nodes by color classes');
+        setInfo(`Nodes grouped by color classes (${k} classes).`);
+      }
+    };
+
+    requestAnimationFrame(step);
+  };
+
   // // ---- NEW: adjacency/targets helpers for recoloring ----
   // const adj = useMemo(() => {
   //   const m = new Map();
@@ -1455,6 +1549,14 @@ export default function HSAlgo() {
                   className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
                 >
                   Sort by ID (animate)
+                </button>
+                <button
+                  onClick={groupByColorClasses}
+                  disabled={!enforceMaxDegree || k === 0}
+                  className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                  title={!enforceMaxDegree || k === 0 ? "Enable 'Enforce Max Degree' and set max degree to use this feature" : "Group nodes by their color classes"}
+                >
+                  Group by Color Classes
                 </button>
               </div>
             </div>
