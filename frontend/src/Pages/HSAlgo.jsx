@@ -803,29 +803,60 @@ export default function HSAlgo() {
     setPanStart({ x: e.clientX, y: e.clientY });
   };
 
+  // Helper to convert screen coordinates to SVG coordinates accounting for zoom/pan
+  const screenToSVG = (svgElement, clientX, clientY) => {
+    if (!svgElement) return { x: 0, y: 0 };
+    
+    const rect = svgElement.getBoundingClientRect();
+    // Get mouse position relative to SVG element
+    const mouseX = clientX - rect.left;
+    const mouseY = clientY - rect.top;
+    
+    // The SVG has a CSS transform: scale(zoom) translate(pan.x, pan.y) with transform-origin: center
+    // The transform origin is the center of the SVG element
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    
+    // Reverse the transformation:
+    // 1. Remove pan (pan is in screen pixels)
+    // 2. Get position relative to center
+    // 3. Divide by zoom to reverse scale
+    // 4. Add center back to get absolute position
+    const svgX = ((mouseX - pan.x) - centerX) / zoom + centerX;
+    const svgY = ((mouseY - pan.y) - centerY) / zoom + centerY;
+    
+    return { x: svgX, y: svgY };
+  };
+
   const handleMouseDown = (e, node) => {
     if (isSorting) return;
     e.preventDefault();
-    const rect = e.currentTarget.closest('svg').getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
+    e.stopPropagation();
+    
+    const svgElement = svgRef.current;
+    if (!svgElement) return;
+    
+    const svgCoords = screenToSVG(svgElement, e.clientX, e.clientY);
 
     setDraggedNode(node.id);
     setDragOffset({
-      x: mouseX - node.x,
-      y: mouseY - node.y
+      x: svgCoords.x - node.x,
+      y: svgCoords.y - node.y
     });
   };
 
   const handleMouseMove = (e) => {
     if (draggedNode) {
       e.preventDefault();
-      const rect = e.currentTarget.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
+      e.stopPropagation();
+      
+      const svgElement = svgRef.current;
+      if (!svgElement) return;
+      
+      const svgCoords = screenToSVG(svgElement, e.clientX, e.clientY);
 
-      const newX = Math.max(25, Math.min(width - 25, mouseX - dragOffset.x));
-      const newY = Math.max(25, Math.min(height - 25, mouseY - dragOffset.y));
+      const newX = Math.max(25, Math.min(width - 25, svgCoords.x - dragOffset.x));
+      const newY = Math.max(25, Math.min(height - 25, svgCoords.y - dragOffset.y));
 
       const newNodes = nodes.map(node =>
         node.id === draggedNode
@@ -1819,7 +1850,7 @@ export default function HSAlgo() {
                     key={n.id}
                     onMouseDown={(e) => handleMouseDown(e, n)}
                     style={{ cursor: draggedNode === n.id ? 'grabbing' : 'grab' }}
-                    className="transition-all duration-300"
+                    className={draggedNode === n.id ? '' : 'transition-all duration-300'}
                   >
                     <circle
                       cx={n.x}
@@ -1828,7 +1859,7 @@ export default function HSAlgo() {
                       fill={getNodeFill(n.id)}
                       stroke="#6B7280"
                       strokeWidth={2}
-                      className="transition-all duration-300 hover:stroke-slate-400"
+                      className={draggedNode === n.id ? 'hover:stroke-slate-400' : 'transition-all duration-300 hover:stroke-slate-400'}
                     />
                     <text
                       x={n.x}
@@ -1838,7 +1869,7 @@ export default function HSAlgo() {
                       fontSize={14}
                       fontWeight="bold"
                       fill="#FFFFFF"
-                      className="transition-all duration-300 select-none"
+                      className={draggedNode === n.id ? 'select-none' : 'transition-all duration-300 select-none'}
                     >
                       {n.id}
                     </text>
