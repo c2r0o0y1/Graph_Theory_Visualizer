@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import Navbar from '../Components/NavBar';
 
 export default function HSAlgo() {
@@ -12,17 +12,17 @@ export default function HSAlgo() {
   const [isSorting, setIsSorting] = useState(false);
   const [showSortGuide, setShowSortGuide] = useState(false);
 
-  // Visualization features (kept)
+  // Visualization features
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
 
-  // History (nodes-only)
+  // History (nodes-only, unchanged)
   const [history, setHistory] = useState([]);
   const [currentStep, setCurrentStep] = useState(0);
 
-
+  // Max degree & coloring UI
   const [enforceMaxDegree, setEnforceMaxDegree] = useState(false);
   const [maxDegree, setMaxDegree] = useState('');
 
@@ -33,12 +33,16 @@ export default function HSAlgo() {
   const height = 500;
   const svgRef = useRef(null);
 
+  // ---- NEW: coloring state + helpers ----
+  // class index in [0..r] for each node id
+  const [coloring, setColoring] = useState({}); // { [nodeId]: classIndex }
+  const mod = (a, m) => ((a % m) + m) % m;
+
   //helper fns
   const normalizeEdge = (u, v) => {
     const a = Math.min(u, v), b = Math.max(u, v);
     return `${a}-${b}`;
   };
-
 
   const buildAddEdgeFn = (r, ids) => {
     const deg = new Map(ids.map(id => [id, 0]));
@@ -73,30 +77,60 @@ export default function HSAlgo() {
       });
   };
 
-
   //---------------------------------------------------------------------------
 
-  const colorPalette = useMemo(() => {
+  // k = r+1 if enforced and valid
+  const k = useMemo(() => {
     const rInt = parseInt(maxDegree, 10);
-    if (!enforceMaxDegree || isNaN(rInt) || rInt < 0) return [];
-    const k = rInt + 1;
+    if (!enforceMaxDegree || isNaN(rInt) || rInt < 0) return 0;
+    return rInt + 1;
+  }, [enforceMaxDegree, maxDegree]);
+
+  // Palette for k classes
+  const colorPalette = useMemo(() => {
+    if (!k) return [];
     return Array.from({ length: k }, (_, i) =>
       `hsl(${Math.round((360 * i) / k)}, 70%, 55%)`
     );
-  }, [enforceMaxDegree, maxDegree]); 
-  
-  
+  }, [k]);
+
+  // Keep coloring defined for all nodes & within range when k changes
+  useEffect(() => {
+    if (!k) return; // nothing to color
+    setColoring(prev => {
+      const next = { ...prev };
+      let changed = false;
+      for (const n of nodes) {
+        if (next[n.id] == null) {
+          next[n.id] = mod(n.id - 1, k); // trivial starting assignment
+          changed = true;
+        } else if (next[n.id] >= k || next[n.id] < 0) {
+          next[n.id] = mod(next[n.id], k);
+          changed = true;
+        }
+      }
+      // drop stale entries
+      for (const idStr of Object.keys(next)) {
+        const id = Number(idStr);
+        if (!nodes.some(n => n.id === id)) {
+          delete next[idStr];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [nodes, k]);
+
+  // Class sizes from current coloring
   const colorCounts = useMemo(() => {
-    if (!colorPalette.length) return [];
-    const rInt = parseInt(maxDegree, 10);
-    const k = rInt + 1;
+    if (!k) return [];
     const counts = Array.from({ length: k }, () => 0);
     nodes.forEach(n => {
-      const idx = (n.id - 1) % k;
-      counts[idx]++;
+      const c = coloring[n.id];
+      if (c != null && c >= 0 && c < k) counts[c]++;
     });
     return counts;
-  }, [nodes, colorPalette, maxDegree]);
+  }, [nodes, coloring, k]);
 
   // History helpers (nodes-only)
   const saveToHistory = (newNodes, operation = '') => {
@@ -195,7 +229,7 @@ export default function HSAlgo() {
 
     const finalNodes = [...nodes, ...newNodesToAdd];
     setNodes(finalNodes);
-    setEdges([]); 
+    setEdges([]);
     setBulkNodeCount('');
     saveToHistory(finalNodes, `Added ${count} nodes (${startId}-${startId + count - 1})`);
     setInfo(`Added ${count} nodes`);
@@ -206,7 +240,7 @@ export default function HSAlgo() {
     if (isNaN(id)) return;
     const newNodes = nodes.filter(n => n.id !== id);
     setNodes(newNodes);
-    setEdges([]); 
+    setEdges([]);
     setDeleteNodeId('');
     saveToHistory(newNodes, `Deleted node ${id}`);
     setInfo(`Deleted node ${id}`);
@@ -219,12 +253,12 @@ export default function HSAlgo() {
     setDraggedNode(null);
     setHistory([]);
     setCurrentStep(0);
-    setEdges([]); 
+    setEdges([]);
+    setColoring({});
     setInfo('Graph cleared');
   };
 
-  // Create the example grid graph
-  //why do we need this?
+  // Example graph (kept; id:0 is tolerated via safe modulo)
   const createExampleGraph = () => {
     const exampleNodes = [
       // Top row
@@ -233,13 +267,13 @@ export default function HSAlgo() {
       { id: 4, x: 300, y: 100 },
       { id: 3, x: 400, y: 100 },
       { id: 8, x: 500, y: 100 },
-      
+
       // Middle row
       { id: 7, x: 100, y: 200 },
-      { id: 0, x: 200, y: 200 },
+      { id: 0, x: 200, y: 200 }, // safe via mod()
       { id: 1, x: 300, y: 200 },
       { id: 2, x: 400, y: 200 },
-      
+
       // Bottom section
       { id: 12, x: 100, y: 350 },
       { id: 13, x: 200, y: 350 },
@@ -251,6 +285,7 @@ export default function HSAlgo() {
     ];
 
     setNodes(exampleNodes);
+    setEdges([]);
     saveToHistory(exampleNodes, 'Created example grid graph');
     setInfo('Loaded example graph with nodes arranged in a grid pattern');
   };
@@ -325,18 +360,18 @@ export default function HSAlgo() {
     setIsPanning(false);
   };
 
-  // Stats (nodes-only)
+  // Stats
   const nodeIds = nodes.map(n => n.id).sort((a, b) => a - b);
 
-
+  // Fill color from current coloring
   const getNodeFill = (id) => {
-    if (!colorPalette.length) return '#E5E7EB'; // neutral when not enforced
-    const rInt = parseInt(maxDegree, 10);
-    const k = rInt + 1;
-    const idx = (id - 1) % k;
+    if (!k || !colorPalette.length) return '#E5E7EB'; // neutral when not enforced
+    const c = coloring[id];
+    const idx = c == null ? mod(id - 1, k) : c;
     return colorPalette[idx];
   };
 
+  // ==== Edge builders from your original code (simulateEdges kept; conflictProne kept) ====
 
   const simulateEdges = () => {
     const r = parseInt(maxDegree, 10);
@@ -399,8 +434,6 @@ export default function HSAlgo() {
     setInfo(`Built a connected graph with max degree ≤ ${r} (${out.length} edges).`);
   };
 
-
-
   const applyBulkEdgesFromText = () => {
     const r = parseInt(maxDegree, 10);
     if (isNaN(r) || r < 0) {
@@ -415,10 +448,10 @@ export default function HSAlgo() {
       alert('Paste edges like: 1-2, 2-3, 5-1');
       return;
     }
-  
+
     // Known node IDs
     const ids = new Set(nodes.map(n => n.id));
-  
+
     let pairs;
     try {
       pairs = parseBulkEdges(bulkEdgesText);
@@ -426,7 +459,7 @@ export default function HSAlgo() {
       alert(e.message);
       return;
     }
-  
+
     // Validate node existence and duplicates/self-loops
     const unique = new Set();
     for (const [u, v] of pairs) {
@@ -442,7 +475,7 @@ export default function HSAlgo() {
       if (unique.has(key)) continue;
       unique.add(key);
     }
-  
+
     // Degree accounting
     const deg = new Map([...ids].map(id => [id, 0]));
     for (const key of unique) {
@@ -450,7 +483,7 @@ export default function HSAlgo() {
       deg.set(a, deg.get(a) + 1);
       deg.set(b, deg.get(b) + 1);
     }
-  
+
     // Check constraints
     for (const id of ids) {
       const d = deg.get(id) ?? 0;
@@ -463,13 +496,13 @@ export default function HSAlgo() {
         return;
       }
     }
-  
+
     // All good → apply
     const out = [...unique].map(key => {
       const [a, b] = key.split('-').map(Number);
       return { a, b };
     });
-  
+
     setEdges(out);
     saveToHistory(nodes, 'Applied bulk predefined edges');
     setInfo(`Applied ${out.length} predefined edges.`);
@@ -478,38 +511,38 @@ export default function HSAlgo() {
   const buildConflictProneEdges = () => {
     const r = parseInt(maxDegree, 10);
     const n = nodes.length;
-  
+
     if (!enforceMaxDegree) {
       alert('Enable "Enforce Max Degree" and set r first.');
       return;
     }
     if (isNaN(r) || r < 1) {
-      alert('Enter r >= 1 to build conflict-prone edges.');
+      alert('Enter r > 1 to build conflict-prone edges.');
       return;
     }
     if (n < 2) {
       alert('Add at least 2 nodes.');
       return;
     }
-  
+
     const ordered = [...nodes].sort((a, b) => a.id - b.id);
     const ids = ordered.map(n => n.id);
     const { addEdge, out, deg } = buildAddEdgeFn(r, ids);
-  
-    const k = r + 1; // number of color classes
-    const clsOf = (id) => (id - 1) % k;
-  
+
+    const kLocal = r + 1;
+    const clsOf = (id) => mod(id - 1, kLocal);
+
     // Group ids by color class
-    const groups = Array.from({ length: k }, () => []);
+    const groups = Array.from({ length: kLocal }, () => []);
     for (const id of ids) groups[clsOf(id)].push(id);
-  
+
     // STEP 1: Within-class simple chains only (NO cross-class edges here)
     for (const g of groups) {
       for (let i = 0; i + 1 < g.length; i++) {
-        addEdge(g[i], g[i + 1]); // addEdge respects r; if too tight, link is skipped
+        addEdge(g[i], g[i + 1]);
       }
     }
-  
+
     // Helper: pick lowest-degree available node from a class
     const pickFromClass = (c) => {
       const avail = groups[c].filter(u => (deg.get(u) ?? 0) < r);
@@ -521,33 +554,30 @@ export default function HSAlgo() {
       });
       return avail[0];
     };
-  
+
     // STEP 4: EXACTLY ONE CROSS-CLASS EDGE PER CLASS PAIR
-    for (let c1 = 0; c1 < k; c1++) {
-      for (let c2 = c1 + 1; c2 < k; c2++) {
-        // If a class is empty, skip this pair gracefully
+    for (let c1 = 0; c1 < kLocal; c1++) {
+      for (let c2 = c1 + 1; c2 < kLocal; c2++) {
         if (groups[c1].length === 0 || groups[c2].length === 0) continue;
-  
+
         let u = pickFromClass(c1);
         let v = pickFromClass(c2);
-  
-        // Try to rotate once if top candidate becomes unavailable due to addEdge ordering
+
         if (u == null || v == null) {
           alert(
             `Cannot place the required single cross-class edge between classes ${c1} and ${c2} without exceeding r=${r}.`
           );
           return;
         }
-  
+
         if (!addEdge(u, v)) {
-          // Retry with next best candidates (simple fallback within class)
           const cand1 = groups[c1]
             .filter(x => (deg.get(x) ?? 0) < r)
             .sort((a, b) => (deg.get(a) ?? 0) - (deg.get(b) ?? 0) || a - b);
           const cand2 = groups[c2]
             .filter(x => (deg.get(x) ?? 0) < r)
             .sort((a, b) => (deg.get(a) ?? 0) - (deg.get(b) ?? 0) || a - b);
-  
+
           let placed = false;
           for (const x of cand1) {
             if (placed) break;
@@ -564,45 +594,36 @@ export default function HSAlgo() {
         }
       }
     }
-  
+
     setEdges(out);
     saveToHistory(nodes, 'Conflict edges: within-class chains + exactly one edge per class pair');
     setInfo(
       `Built ${out.length} edges: within-class chains; exactly one edge for each pair of color classes; degree ≤ ${r}.`
     );
   };
-  
-
 
   const clearEdges = () => {
     setEdges([]);
     setInfo('Cleared all edges.');
   };
 
-
-
   // ===== Sort-by-ID (animated, 5 per row with gaps) =====
   const sortNodesAnimated = () => {
     if (nodes.length === 0) return;
 
-    // Layout params
-    const cols = 5;              // exactly 5 per row
-    const marginX = 60;          // left/right padding
-    const marginY = 60;          // top/bottom padding
+    const cols = 5;
+    const marginX = 60;
+    const marginY = 60;
     const usableW = Math.max(0, width - 2 * marginX);
     const usableH = Math.max(0, height - 2 * marginY);
 
-    // Order nodes by ID so they appear 1..N left-to-right, top-to-bottom
     const ordered = [...nodes].sort((a, b) => a.id - b.id);
     const n = ordered.length;
     const rows = Math.max(1, Math.ceil(n / cols));
 
-    // Spacing between nodes (gaps) along x and y
-    // If there's only one column/row, avoid division by zero and center vertically/horizontally.
     const gapX = cols > 1 ? usableW / (cols - 1) : 0;
     const gapY = rows > 1 ? usableH / (rows - 1) : 0;
 
-    // target map: id -> {x,y} for grid center points
     const target = new Map();
     for (let idx = 0; idx < n; idx++) {
       const row = Math.floor(idx / cols);
@@ -612,10 +633,7 @@ export default function HSAlgo() {
       target.set(ordered[idx].id, { x, y });
     }
 
-    // capture start positions
     const start = new Map(nodes.map(n => [n.id, { x: n.x, y: n.y }]));
-
-    // animation params
     const duration = 700; // ms
     const startTs = performance.now();
     const easeInOutCubic = (t) =>
@@ -652,6 +670,151 @@ export default function HSAlgo() {
     };
 
     requestAnimationFrame(step);
+  };
+
+  // ---- NEW: adjacency/targets helpers for recoloring ----
+  const adj = useMemo(() => {
+    const m = new Map();
+    nodes.forEach(n => m.set(n.id, new Set()));
+    edges.forEach(({ a, b }) => {
+      if (!m.has(a)) m.set(a, new Set());
+      if (!m.has(b)) m.set(b, new Set());
+      m.get(a).add(b);
+      m.get(b).add(a);
+    });
+    return m;
+  }, [nodes, edges]);
+
+  const targetSizes = useMemo(() => {
+    if (!k) return [];
+    const n = nodes.length;
+    const base = Math.floor(n / k), extra = n % k;
+    return Array.from({ length: k }, (_, i) => base + (i < extra ? 1 : 0));
+  }, [nodes.length, k]);
+
+  const bucketsFrom = (col) => {
+    const b = Array.from({ length: k }, () => new Set());
+    for (const n of nodes) {
+      const c = col[n.id];
+      if (c != null && c >= 0 && c < k) b[c].add(n.id);
+    }
+    return b;
+  };
+
+  const canMove = (v, toClass, col) => {
+    for (const u of adj.get(v) || []) {
+      if (col[u] === toClass) return false;
+    }
+    return true;
+  };
+
+  const hasCapacity = (cls, buckets, targets) => {
+    if (cls < 0 || cls >= buckets.length) return false;
+    return buckets[cls].size < targets[cls];
+  };
+
+  // ---- NEW: Case 1 recoloring step ----
+  // ---- REPLACE your runCase1Step with this version ----
+  const runCase1Step = () => {
+    const r = parseInt(maxDegree, 10);
+    if (!enforceMaxDegree || isNaN(r) || r < 0) {
+      setInfo('Enable "Enforce Max Degree" and set a valid r first.');
+      return;
+    }
+    if (!k) { setInfo('Invalid number of color classes.'); return; }
+    if (edges.length === 0) { setInfo('No edges to resolve.'); return; }
+
+    // 1) Find a monochromatic (conflict) edge xy in class V
+    const col0 = { ...coloring };
+    let conflict = null;
+    for (const { a, b } of edges) {
+      if (col0[a] != null && col0[a] === col0[b]) { conflict = { x: a, y: b, V: col0[a] }; break; }
+    }
+    if (!conflict) {
+      setInfo('Already a proper coloring (no monochromatic edges).');
+      return;
+    }
+    const { x, y, V } = conflict;
+
+    // Helpers
+    const bucketsFrom = (col) => {
+      const b = Array.from({ length: k }, () => new Set());
+      for (const n of nodes) {
+        const c = col[n.id];
+        if (c != null && c >= 0 && c < k) b[c].add(n.id);
+      }
+      return b;
+    };
+    const canMove = (v, toClass, col) => {
+      for (const u of adj.get(v) || []) {
+        if (col[u] === toClass) return false;
+      }
+      return true;
+    };
+    const hasCapacity = (cls, buckets, targets) =>
+      cls >= 0 && cls < buckets.length && buckets[cls].size < targets[cls];
+
+    // 2) Primary move: move one endpoint (x or y) to some W != V
+    //    IMPORTANT: do NOT require capacity for this move; allow a temporary overfull class
+    let mover = null, W = null;
+    const tryEndpoint = (v) => {
+      for (let cls = 0; cls < k; cls++) if (cls !== V) {
+        if (canMove(v, cls, col0)) return cls;
+      }
+      return null;
+    };
+    W = tryEndpoint(x); mover = x;
+    if (W == null) { W = tryEndpoint(y); mover = y; }
+    if (W == null) {
+      setInfo('Case 1: neither endpoint can move to any other class without conflict.');
+      return;
+    }
+
+    // apply mover -> W (nearly equitable allowed)
+    const col1 = { ...col0 };
+    col1[mover] = W;
+
+    // 3) Now find z ∈ W and X ≠ W, such that:
+    //    - X has capacity,
+    //    - z can move to X,
+    //    - there exists y1 ∈ V ∩ N(z) that becomes movable to W once z leaves W.
+    const buckets1 = bucketsFrom(col1);   // after mover→W
+    for (const z of buckets1[W]) {
+      for (let X = 0; X < k; X++) if (X !== W) {
+        if (!hasCapacity(X, buckets1, targetSizes)) continue;   // require capacity for z→X
+        if (!canMove(z, X, col1)) continue;
+
+        // S_z = neighbors of z in class V (under col1)
+        const Sz = [...(adj.get(z) || [])].filter(u => col1[u] === V);
+        for (const y1 of Sz) {
+          // After z leaves W, does y1 have any neighbor remaining in W?
+          let ok = true;
+          for (const u of adj.get(y1) || []) {
+            if (u === z) continue; // z will leave W
+            if (col1[u] === W) { ok = false; break; }
+          }
+          if (!ok) continue;
+
+          // Perform the two recolor moves:
+          // (a) z: W -> X  (X had capacity)
+          const col2 = { ...col1 };
+          col2[z] = X;
+
+          // (b) y1: V -> W (now safe because z left W)
+          if (!canMove(y1, W, col2)) {
+            // Safety; should be fine given the check above
+            continue;
+          }
+          col2[y1] = W;
+
+          setColoring(col2);
+          setInfo(`Case 1: moved ${mover} to class ${W}; then ${z} ${W}→${X}; then ${y1} ${V}→${W}.`);
+          return;
+        }
+      }
+    }
+
+    setInfo('Case 1: no suitable (z, X, y₁) found after the endpoint move. Try a different graph or r.');
   };
 
 
@@ -711,7 +874,6 @@ export default function HSAlgo() {
             </div>
           )}
 
-
           {/* Maximum Degree Constraint */}
           <div className="bg-gradient-to-r from-yellow-50 to-amber-50 rounded-xl shadow-lg p-6 mb-8 border border-yellow-200">
             <div className="flex flex-wrap items-center gap-4">
@@ -721,126 +883,55 @@ export default function HSAlgo() {
                 </svg>
                 <h3 className="text-lg font-semibold text-slate-800">Graph Coloring Algorithm</h3>
               </div>
-                <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3">
                 <label className="flex items-center">
-                    <input
+                  <input
                     type="checkbox"
                     checked={enforceMaxDegree}
                     onChange={(e) => setEnforceMaxDegree(e.target.checked)}
                     className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                    />
-                    <span className="text-sm font-medium text-slate-700">Enforce Max Degree</span>
+                  />
+                  <span className="text-sm font-medium text-slate-700">Enforce Max Degree</span>
                 </label>
                 <input
-                    type="number"
-                    placeholder="Max degree (r)"
-                    value={maxDegree}
-                    onChange={(e) => setMaxDegree(e.target.value)}
-                    min="0"
-                    className="px-3 py-1 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                  type="number"
+                  placeholder="Max degree (r)"
+                  value={maxDegree}
+                  onChange={(e) => setMaxDegree(e.target.value)}
+                  min="0"
+                  className="px-3 py-1 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500"
                 />
                 {enforceMaxDegree && colorPalette.length > 0 && (
-                    <span className="text-sm text-slate-700">Using <b>{parseInt(maxDegree, 10) + 1}</b> colors</span>
+                  <span className="text-sm text-slate-700">Using <b>{parseInt(maxDegree, 10) + 1}</b> colors</span>
                 )}
-                </div>
+              </div>
 
-                {/* Legend */}
-                {enforceMaxDegree && colorPalette.length > 0 && (
+              {/* Legend with actual sizes vs targets */}
+              {enforceMaxDegree && colorPalette.length > 0 && (
                 <div className="w-full mt-3 flex flex-wrap gap-3">
-                    {colorPalette.map((c, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                        <span className="inline-block w-3 h-3 rounded-full border border-black/10" style={{ background: c }} />
-                        <span className="text-xs text-slate-700">class {i}: {colorCounts[i] ?? 0}</span>
-                    </div>
-                    ))}
+                  {Array.from({ length: k }, (_, i) => i).map((i) => {
+                    const size = nodes.filter(n => coloring[n.id] === i).length;
+                    const target = targetSizes[i] ?? 0;
+                    return (
+                      <div key={i} className="flex items-center gap-2">
+                        <span className="inline-block w-3 h-3 rounded-full border border-black/10" style={{ background: colorPalette[i] }} />
+                        <span className="text-xs text-slate-700">class {i}: {size} / {target}</span>
+                      </div>
+                    );
+                  })}
                 </div>
-                )}
-                {/* NEW: Edge Simulation Controls */}
-                {/*<div className="w-full mt-3 flex flex-wrap gap-2">
-                  <button
-                    onClick={sortNodesAnimated}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
-                  >
-                    Sort by ID (animate)
-                  </button>
-                  <button
-                    onClick={simulateEdges}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
-                  >
-                    Simulate Edges
-                  </button>
-                  <button
-                    onClick={clearEdges}
-                    className="bg-slate-600 hover:bg-slate-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
-                  >
-                    Clear Edges
-                  </button>
-                  <span className="text-xs text-slate-600 self-center">
-                    Pattern: i → (i+1..i+r), undirected (no wrap). With k=r+1 colors, neighbors differ.
-                  </span>
-                </div>*/}
+              )}
 
-                <div className="w-full mt-3 flex flex-wrap gap-2">
-                  <button
-                    onClick={sortNodesAnimated}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
-                  >
-                    Sort by ID (animate)
-                  </button>
-
-                  {/*<button
-                    onClick={simulateEdges}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
-                  >
-                    Simulate Edges (balanced)
-                  </button>
-
-                  <button
-                    onClick={buildConflictProneEdges}
-                    className="bg-amber-600 hover:bg-amber-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
-                    title="Favor edges within the same color class, respect r, avoid complete graphs"
-                  >
-                    Conflict-Prone Edges
-                  </button>
-
-                  <button
-                    onClick={clearEdges}
-                    className="bg-slate-600 hover:bg-slate-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
-                  >
-                    Clear Edges
-                  </button>
-
-                  <span className="text-xs text-slate-600 self-center">
-                    Balanced: i→(i+1..i+r). Conflict-prone: favors same color class.
-                  </span>*/}
-                </div>
-
-                {/* Bulk predefined edges */}
-                {/*<div className="w-full mt-3">
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Bulk predefined edges (format: <code>1-2, 2-3, 5-1</code> or line-separated)
-                  </label>
-                  <textarea
-                    value={bulkEdgesText}
-                    onChange={(e) => setBulkEdgesText(e.target.value)}
-                    rows={3}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
-                    placeholder="1-2, 2-3, 5-1"
-                  />
-                  <div className="mt-2 flex gap-2">
-                    <button
-                      onClick={applyBulkEdgesFromText}
-                      className="bg-amber-600 hover:bg-amber-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
-                    >
-                      Apply Bulk Edges
-                    </button>
-                    <span className="text-xs text-slate-600 self-center">
-                      Requires r. Every node must have ≥1 edge and ≤r.
-                    </span>
-                  </div>
-                </div>*/}
+              <div className="w-full mt-3 flex flex-wrap gap-2">
+                <button
+                  onClick={sortNodesAnimated}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                >
+                  Sort by ID (animate)
+                </button>
+              </div>
             </div>
-        </div>
+          </div>
 
           {/* Control Panel */}
           <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-xl p-8 mb-8 border border-slate-200">
@@ -854,7 +945,6 @@ export default function HSAlgo() {
                   <h3 className="text-lg font-bold text-slate-800">Node Operations</h3>
                 </div>
 
-                {/* Single Node */}
                 <button
                   onClick={addNode}
                   className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
@@ -862,7 +952,6 @@ export default function HSAlgo() {
                   Add Single Node
                 </button>
 
-                {/* Bulk Nodes */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-slate-700">Add Multiple Nodes</label>
                   <input
@@ -885,7 +974,6 @@ export default function HSAlgo() {
                   </button>
                 </div>
 
-                {/* Delete Node */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-slate-700">Delete Node</label>
                   <input
@@ -917,7 +1005,6 @@ export default function HSAlgo() {
                   <h3 className="text-lg font-bold text-slate-800">Tools</h3>
                 </div>
 
-                {/* Undo/Redo */}
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     onClick={undo}
@@ -935,7 +1022,6 @@ export default function HSAlgo() {
                   </button>
                 </div>
 
-                {/* Example Graph */}
                 <button
                   onClick={createExampleGraph}
                   className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors font-semibold"
@@ -943,7 +1029,6 @@ export default function HSAlgo() {
                   Example Graph
                 </button>
 
-                {/* Clear Graph */}
                 <button
                   onClick={clearGraph}
                   className="w-full bg-slate-600 hover:bg-slate-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
@@ -951,7 +1036,6 @@ export default function HSAlgo() {
                   Clear Graph
                 </button>
 
-                {/* Display Options */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-slate-700">Display</label>
                   <div className="text-xs text-slate-600">
@@ -960,7 +1044,7 @@ export default function HSAlgo() {
                 </div>
               </div>
 
-              {/* Empty third column for symmetry / future controls */}
+              {/* Edge Operations */}
               <div className="space-y-2">
                 <div className="flex items-center gap-2 pb-3 border-b-2 border-amber-200">
                   <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -992,15 +1076,8 @@ export default function HSAlgo() {
                     </span>
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {/* <button
-                    onClick={simulateEdges}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
-                    title="Balanced pattern: i → (i+1..i+r), undirected (no wrap)"
-                  >
-                    Simulate Edges (balanced)
-                  </button> */}
 
+                <div className="flex flex-wrap gap-2">
                   <button
                     onClick={buildConflictProneEdges}
                     className="bg-amber-600 hover:bg-amber-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
@@ -1010,10 +1087,27 @@ export default function HSAlgo() {
                   </button>
 
                   <button
+                    onClick={simulateEdges}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                    title="Balanced pattern: i → (i+1..i+r), undirected (no wrap)"
+                  >
+                    Simulate Edges (balanced)
+                  </button>
+
+                  <button
                     onClick={clearEdges}
                     className="bg-slate-600 hover:bg-slate-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
                   >
                     Clear Edges
+                  </button>
+
+                  {/* NEW: Case 1 recoloring trigger */}
+                  <button
+                    onClick={runCase1Step}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                    title="Two-move Case 1 recoloring step"
+                  >
+                    Case 1 Recolor Step
                   </button>
                 </div>
               </div>
@@ -1069,7 +1163,8 @@ export default function HSAlgo() {
                     </g>
                   );
                 })()}
-                {/* NEW: Edges (render behind nodes) */}
+
+                {/* Edges */}
                 {edges.map(({ a, b }) => {
                   const na = nodes.find(n => n.id === a);
                   const nb = nodes.find(n => n.id === b);
@@ -1112,35 +1207,24 @@ export default function HSAlgo() {
                       dy=".3em"
                       fontSize={14}
                       fontWeight="bold"
-                      fill="#FFFFFF" 
+                      fill="#FFFFFF"
                       className="transition-all duration-300 select-none"
                     >
                       {n.id}
                     </text>
-                    {/* Coordinates under each node */}
-                    {/* <text
-                      x={n.x}
-                      y={n.y + 40}
-                      textAnchor="middle"
-                      fontSize={10}
-                      fill="#6B7280"
-                      className="pointer-events-none"
-                    >
-                      ({n.x.toFixed(0)}, {n.y.toFixed(0)})
-                    </text> */}
                   </g>
                 ))}
               </svg>
             </div>
           </div>
 
-           {/* Quick Guide */}
-           <div className="mt-8 bg-gradient-to-r from-slate-50 to-emerald-50 rounded-xl p-4 border border-slate-200 shadow-sm">
-             <div className="flex items-center justify-between text-sm text-slate-600">
-               <span>🖱️ <strong>Drag</strong> nodes • <strong>Scroll</strong> to zoom • <strong>Drag background</strong> to pan</span>
-               <span>🎨 <strong>Add nodes</strong> → <strong>Set max degree</strong> → <strong>Visualize colors</strong></span>
-             </div>
-           </div>
+          {/* Quick Guide */}
+          <div className="mt-8 bg-gradient-to-r from-slate-50 to-emerald-50 rounded-xl p-4 border border-slate-200 shadow-sm">
+            <div className="flex items-center justify-between text-sm text-slate-600">
+              <span>🖱️ <strong>Drag</strong> nodes • <strong>Scroll</strong> to zoom • <strong>Drag background</strong> to pan</span>
+              <span>🎨 <strong>Add nodes</strong> → <strong>Set max degree</strong> → <strong>Case 1</strong> to repair conflicts</span>
+            </div>
+          </div>
         </div>
       </div>
     </>
