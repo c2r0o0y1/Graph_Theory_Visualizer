@@ -80,15 +80,16 @@ function computeHSSteps(nodesList, edgesList, r, k) {
 
   /* Restore equitability (Lemma 2.1 + Case 2 fallback).
      Case 1 (Lemma 2.1): BFS in H(G,f) from V+ to V-; move one vertex per arc.
-     Case 2 fallback: when V+ is not accessible to V-, use the proof's solo-edge
-     argument. We find a vertex in an accessible class that can be swapped with
-     a vertex in B to shrink V+.  If even that fails, we do a direct "Kempe-style"
-     recolor: try every vertex in V+ and move it to the first class with room,
-     then recurse. This is guaranteed to terminate because each swap strictly
-     decreases the gap. */
+     Case 2: when V+ is not accessible to V- in H, broaden the search:
+       (a) BFS from V+ to any class smaller than V+
+       (b) direct move from any oversized class to any undersized class
+       (c) two-hop chain: big → mid → small
+       (d) swap: exchange vertices between an oversized and undersized class */
   const restoreEquitable = () => {
+    const target = Math.floor(n / k);
+    const extra = n % k;            /* first `extra` classes get target+1 */
     let iter = 0;
-    while (iter++ < 200) {
+    while (iter++ < 300) {
       const s = sizes();
       const mx = Math.max(...s), mn = Math.min(...s);
       if (mx - mn <= 1) { steps.push(snap('equitable', `Equitable restored. Class sizes: [${s.join(', ')}].`)); return; }
@@ -109,85 +110,145 @@ function computeHSSteps(nodesList, edgesList, r, k) {
             `Lemma 2.1: move vertex ${y} from class ${path[j]} \u2192 class ${path[j + 1]}.`,
             { movedVertex: y, fromClass: path[j], toClass: path[j + 1], auxPath: path }));
         }
-        continue; /* re-check sizes after moves */
+        continue;
       }
 
-      /* ── Case 2 fallback ── */
-      /* V+ is NOT accessible to V-.  Per the proof, there exist accessible
-         classes (A) and non-accessible classes (B).  We look for any vertex
-         in the largest class that can be moved to any smaller class.  Since
-         d(v) <= r < k, such a target always exists; the issue is it may
-         overfill the target.  By picking the smallest legal target we
-         make the most progress. */
+      /* ── Case 2: V+ not accessible to V- ── */
       steps.push(snap('no_path',
-        `Case 2: V+ = class ${aux.vPlus} not accessible to V- = class ${aux.vMinus}. Applying direct rebalancing.`));
+        `Case 2: V+ = class ${aux.vPlus} not accessible to V- = class ${aux.vMinus}. Broadened rebalancing.`));
 
-      const vPlusClass = aux.vPlus;
-      const vMinusClass = aux.vMinus;
-      const nodesVP = inClass(vPlusClass);
       let moved = false;
 
-      /* Strategy 1: try to move a vertex directly from V+ to V- (the smallest class). */
-      for (const v of nodesVP) {
-        if (!hasNbr(v, vMinusClass)) {
-          col[v] = vMinusClass;
-          steps.push(snap('lemma_move',
-            `Case 2: move vertex ${v} from class ${vPlusClass} \u2192 class ${vMinusClass} (direct V+\u2192V-).`,
-            { movedVertex: v, fromClass: vPlusClass, toClass: vMinusClass }));
-          moved = true;
-          break;
+      /* 2a: BFS from V+ to ANY class with size < s[V+].  Moving along
+         this path shrinks V+ even if V- is unreachable. */
+      if (!moved) {
+        for (let c = 0; c < k; c++) {
+          if (c === aux.vPlus || s[c] >= s[aux.vPlus]) continue;
+          const p2 = bfsPath(aux.edges, aux.vPlus, c);
+          if (p2) {
+            steps.push(snap('aux_path',
+              `Case 2a: path V+ \u2192 class ${c} (size ${s[c]}): ${p2.join(' \u2192 ')}.`,
+              { auxPath: p2 }));
+            for (let j = 0; j < p2.length - 1; j++) {
+              const y = movable(p2[j], p2[j + 1]);
+              if (y === null) break;
+              col[y] = p2[j + 1];
+              steps.push(snap('lemma_move',
+                `Case 2a: move vertex ${y} class ${p2[j]} \u2192 ${p2[j + 1]}.`,
+                { movedVertex: y, fromClass: p2[j], toClass: p2[j + 1], auxPath: p2 }));
+            }
+            moved = true;
+            break;
+          }
         }
       }
 
-      /* Strategy 2: Kempe-chain swap. Find v in V+ that can go to some
-         intermediate class mid, then find w in mid that can go to V-. */
+      /* 2b: direct move from ANY oversized class to ANY undersized class */
       if (!moved) {
-        for (const v of nodesVP) {
-          for (let mid = 0; mid < k; mid++) {
-            if (mid === vPlusClass || mid === vMinusClass) continue;
-            if (hasNbr(v, mid)) continue;
-            /* temporarily move v to mid */
-            col[v] = mid;
-            const w = movable(mid, vMinusClass);
-            if (w !== null && w !== v) {
-              col[w] = vMinusClass;
-              steps.push(snap('lemma_move',
-                `Case 2 chain: vertex ${v} class ${vPlusClass}\u2192${mid}, vertex ${w} class ${mid}\u2192${vMinusClass}.`,
-                { movedVertex: v, fromClass: vPlusClass, toClass: mid }));
-              moved = true;
-              break;
+        const big = Array.from({ length: k }, (_, c) => c).filter(c => s[c] > target + (extra > 0 ? 1 : 0)).sort((a, b) => s[b] - s[a]);
+        const small = Array.from({ length: k }, (_, c) => c).filter(c => s[c] < target).sort((a, b) => s[a] - s[b]);
+        for (const from of big) {
+          for (const to of small) {
+            for (const v of inClass(from)) {
+              if (!hasNbr(v, to)) {
+                col[v] = to;
+                steps.push(snap('lemma_move',
+                  `Case 2b: move vertex ${v} class ${from} \u2192 ${to}.`,
+                  { movedVertex: v, fromClass: from, toClass: to }));
+                moved = true;
+                break;
+              }
             }
-            col[v] = vPlusClass; /* undo */
+            if (moved) break;
           }
           if (moved) break;
         }
       }
 
-      /* Strategy 3: move v from V+ to ANY class strictly smaller than V+.
-         Pick the smallest available target.  This changes H's structure so
-         the next iteration's BFS may succeed where this one failed. */
+      /* 2c: two-hop chain: big → mid → small */
       if (!moved) {
-        const targets = Array.from({ length: k }, (_, c) => c)
-          .filter(c => c !== vPlusClass && s[c] < s[vPlusClass])
-          .sort((a, b) => s[a] - s[b]);
-        for (const v of nodesVP) {
-          for (const t of targets) {
-            if (!hasNbr(v, t)) {
-              col[v] = t;
-              steps.push(snap('lemma_move',
-                `Case 2 fallback: move vertex ${v} from class ${vPlusClass} \u2192 class ${t}.`,
-                { movedVertex: v, fromClass: vPlusClass, toClass: t }));
-              moved = true;
-              break;
+        const big = Array.from({ length: k }, (_, c) => c).filter(c => s[c] > target + (extra > 0 ? 1 : 0)).sort((a, b) => s[b] - s[a]);
+        const small = Array.from({ length: k }, (_, c) => c).filter(c => s[c] < target).sort((a, b) => s[a] - s[b]);
+        for (const from of big) {
+          for (const v of inClass(from)) {
+            for (let mid = 0; mid < k; mid++) {
+              if (mid === from || hasNbr(v, mid)) continue;
+              col[v] = mid;
+              for (const to of small) {
+                const w = movable(mid, to);
+                if (w !== null && w !== v) {
+                  col[w] = to;
+                  steps.push(snap('lemma_move',
+                    `Case 2c chain: vertex ${v} class ${from}\u2192${mid}, vertex ${w} class ${mid}\u2192${to}.`,
+                    { movedVertex: v, fromClass: from, toClass: mid }));
+                  moved = true;
+                  break;
+                }
+              }
+              if (moved) break;
+              col[v] = from;
             }
+            if (moved) break;
           }
           if (moved) break;
         }
       }
 
+      /* 2d: swap — exchange v (big class) and w (small class) if each
+         can safely take the other's color */
       if (!moved) {
-        steps.push(snap('error', `Could not fully equitize. Sizes: [${sizes().join(',')}].`));
-        return;
+        const big = Array.from({ length: k }, (_, c) => c).filter(c => s[c] > target + (extra > 0 ? 1 : 0));
+        const small = Array.from({ length: k }, (_, c) => c).filter(c => s[c] < target);
+        for (const bc of big) {
+          for (const sc of small) {
+            for (const v of inClass(bc)) {
+              if (hasNbr(v, sc)) continue;
+              for (const w of inClass(sc)) {
+                if (w === v || hasNbr(w, bc)) continue;
+                col[v] = sc; col[w] = bc;
+                steps.push(snap('lemma_move',
+                  `Case 2d swap: vertex ${v} class ${bc}\u2192${sc}, vertex ${w} class ${sc}\u2192${bc}.`,
+                  { movedVertex: v, fromClass: bc, toClass: sc }));
+                moved = true;
+                break;
+              }
+              if (moved) break;
+            }
+            if (moved) break;
+          }
+          if (moved) break;
+        }
+      }
+
+      /* 2e: last resort — fresh greedy equitable recoloring.
+         Since d(v) <= r < k, a proper k-coloring always exists.  We
+         recolor from scratch using DSatur-style greedy that targets the
+         smallest class first, guaranteeing near-equitable output.
+         Then the next while-loop iteration uses Lemma 2.1 if needed. */
+      if (!moved) {
+        steps.push(snap('no_path', `Case 2e: all move strategies failed. Applying fresh greedy equitable recoloring.`));
+        const order = [...ids].sort((a, b) => adjW.get(b).size - adjW.get(a).size);
+        const fresh = {};
+        const cc = Array(k).fill(0);
+        const cap = Math.ceil(n / k);
+        for (const v of order) {
+          const used = new Set();
+          for (const u of adjW.get(v)) if (fresh[u] !== undefined) used.add(fresh[u]);
+          let best = -1, bestSz = Infinity;
+          for (let c = 0; c < k; c++) {
+            if (used.has(c) || cc[c] >= cap) continue;
+            if (cc[c] < bestSz) { bestSz = cc[c]; best = c; }
+          }
+          if (best === -1) { for (let c = 0; c < k; c++) if (!used.has(c)) { best = c; break; } }
+          fresh[v] = best;
+          cc[best]++;
+        }
+        let changed = 0;
+        for (const v of ids) { if (col[v] !== fresh[v]) { col[v] = fresh[v]; changed++; } }
+        steps.push(snap('lemma_move',
+          `Greedy recolor: reassigned ${changed} vertices. Sizes: [${sizes().join(', ')}].`,
+          {}));
+        moved = true;
       }
     }
     steps.push(snap('error', 'Equitability loop limit reached.'));
