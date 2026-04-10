@@ -296,9 +296,9 @@ export default function BFS() {
   const svgRef = useRef(null);
 
    // Calculate degree of a node
-   const getNodeDegree = (nodeId) => {
+   const getNodeDegree = useCallback((nodeId) => {
     return edges.filter(e => e.from === nodeId || e.to === nodeId).length;
-  };
+  }, [edges]);
 
   // Get all node degrees
   const getNodeDegrees = () => {
@@ -327,7 +327,7 @@ export default function BFS() {
     });
     
     setNodeColors(newColors);
-  }, [enforceMaxDegree, maxDegree, nodes, edges]);
+  }, [enforceMaxDegree, maxDegree, nodes, getNodeDegree]);
 
   // Update colors when edges or max degree changes
   useEffect(() => {
@@ -379,16 +379,24 @@ export default function BFS() {
     let attempts = 0;
     const maxAttempts = 100;
     
-    do {
-      const newX = Math.random() * (width - 80) + 40;
-      const newY = Math.random() * (height - 80) + 40;
-      x = newX;
-      y = newY;
+    let hasCollision = true;
+    while (attempts < maxAttempts && hasCollision) {
+      const candidateX = Math.random() * (width - 80) + 40;
+      const candidateY = Math.random() * (height - 80) + 40;
       attempts++;
-    } while (attempts < maxAttempts && nodes.some(node => {
-      const distance = Math.sqrt(Math.pow(x - node.x, 2) + Math.pow(y - node.y, 2));
-      return distance < minDistance;
-    }));
+      hasCollision = false;
+
+      for (const node of nodes) {
+        const distance = Math.hypot(candidateX - node.x, candidateY - node.y);
+        if (distance < minDistance) {
+          hasCollision = true;
+          break;
+        }
+      }
+
+      x = candidateX;
+      y = candidateY;
+    }
     
     const newNodes = [...nodes, { id, x, y }];
     setNodes(newNodes);
@@ -412,17 +420,26 @@ export default function BFS() {
       let x, y;
       let attempts = 0;
       const maxAttempts = 200;
+      const occupiedNodes = [...allExistingNodes, ...newNodes];
       
-      do {
-        const newX = Math.random() * (width - 80) + 40;
-        const newY = Math.random() * (height - 80) + 40;
-        x = newX;
-        y = newY;
+      let hasCollision = true;
+      while (attempts < maxAttempts && hasCollision) {
+        const candidateX = Math.random() * (width - 80) + 40;
+        const candidateY = Math.random() * (height - 80) + 40;
         attempts++;
-      } while (attempts < maxAttempts && [...allExistingNodes, ...newNodes].some(node => {
-        const distance = Math.sqrt(Math.pow(x - node.x, 2) + Math.pow(y - node.y, 2));
-        return distance < minDistance;
-      }));
+        hasCollision = false;
+
+        for (const node of occupiedNodes) {
+          const distance = Math.hypot(candidateX - node.x, candidateY - node.y);
+          if (distance < minDistance) {
+            hasCollision = true;
+            break;
+          }
+        }
+
+        x = candidateX;
+        y = candidateY;
+      }
       
       newNodes.push({ id, x, y });
     }

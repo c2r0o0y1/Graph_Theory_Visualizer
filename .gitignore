@@ -1,0 +1,3 @@
+# Root-level local/tooling artifacts
+.claude/
+.DS_Store
