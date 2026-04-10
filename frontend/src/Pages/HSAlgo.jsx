@@ -1,2005 +1,1055 @@
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import Navbar from '../Components/NavBar';
 
-export default function HSAlgo() {
-  const [nodes, setNodes] = useState([]);
-  const [deleteNodeId, setDeleteNodeId] = useState('');
-  const [bulkNodeCount, setBulkNodeCount] = useState('');
-  const [draggedNode, setDraggedNode] = useState(null);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const [edges, setEdges] = useState([]);
-  const [bulkEdgesText, setBulkEdgesText] = useState('');
-  const [isSorting, setIsSorting] = useState(false);
-  const [showSortGuide, setShowSortGuide] = useState(false);
+/* ─────────────────── colour palette ─────────────────── */
+const PALETTE = [
+  '#ef4444', '#3b82f6', '#22c55e', '#eab308',
+  '#a855f7', '#f97316', '#06b6d4', '#ec4899',
+  '#14b8a6', '#f43f5e', '#84cc16', '#6366f1',
+];
+const palette = (k) =>
+  k <= PALETTE.length
+    ? PALETTE.slice(0, k)
+    : Array.from({ length: k }, (_, i) =>
+        `hsl(${Math.round((360 * i) / k)}, 65%, 52%)`
+      );
+const CLASS_NAMES = ['Red', 'Blue', 'Green', 'Yellow', 'Purple', 'Orange', 'Cyan', 'Pink'];
 
-  // Visualization features
+/* ─────────────── pure H-S algorithm (Thm 3.2) ──────── */
+function computeHSSteps(nodesList, edgesList, r, k) {
+  const ids = nodesList.map((n) => n.id).sort((a, b) => a - b);
+  const n = ids.length;
+  const col = {};
+  ids.forEach((id) => { col[id] = id % k; });
+  const active = [];
+  const adjW = new Map();
+  ids.forEach((id) => adjW.set(id, new Set()));
+  const steps = [];
+
+  /* helpers */
+  const hasNbr = (v, c) => { for (const u of adjW.get(v)) if (col[u] === c) return true; return false; };
+  const inClass = (c) => ids.filter((id) => col[id] === c);
+  const movable = (from, to) => { for (const v of inClass(from)) if (!hasNbr(v, to)) return v; return null; };
+  const sizes = () => { const s = Array(k).fill(0); ids.forEach((id) => s[col[id]]++); return s; };
+
+  const buildAux = () => {
+    const s = sizes();
+    let vP = 0, vM = 0;
+    for (let c = 1; c < k; c++) { if (s[c] > s[vP]) vP = c; if (s[c] < s[vM]) vM = c; }
+    const nd = [];
+    for (let c = 0; c < k; c++) nd.push({ id: c, size: s[c], type: c === vP ? 'large' : c === vM ? 'small' : 'normal' });
+    const ed = [];
+    for (let a = 0; a < k; a++) for (let b = 0; b < k; b++) if (a !== b && movable(a, b) !== null) ed.push({ from: a, to: b });
+    return { nodes: nd, edges: ed, path: [], vPlus: vP, vMinus: vM, sizes: s };
+  };
+
+  const bfsPath = (auxEdges, from, to) => {
+    if (from === to) return [from];
+    const aAdj = new Map();
+    for (let c = 0; c < k; c++) aAdj.set(c, []);
+    auxEdges.forEach((e) => aAdj.get(e.from).push(e.to));
+    const par = new Map();
+    const vis = new Set([from]);
+    const q = [from];
+    while (q.length) {
+      const cur = q.shift();
+      if (cur === to) { const p = [to]; let x = to; while (par.has(x)) { x = par.get(x); p.unshift(x); } return p; }
+      for (const nb of aAdj.get(cur) || []) if (!vis.has(nb)) { vis.add(nb); par.set(nb, cur); q.push(nb); }
+    }
+    return null;
+  };
+
+  const snap = (type, msg, hl = {}) => {
+    const aux = buildAux();
+    return {
+      type, message: msg,
+      coloring: { ...col },
+      edges: active.map((e) => ({ ...e })),
+      highlight: {
+        currentEdge: hl.currentEdge || null,
+        movedVertex: hl.movedVertex ?? null,
+        fromClass: hl.fromClass ?? null,
+        toClass: hl.toClass ?? null,
+        conflictEdge: hl.conflictEdge || null,
+        auxPath: hl.auxPath || [],
+        processingVertex: hl.processingVertex ?? null,
+      },
+      auxGraph: { ...aux, path: hl.auxPath || [] },
+    };
+  };
+
+  /* Restore equitability (Lemma 2.1 + Case 2 fallback).
+     Case 1 (Lemma 2.1): BFS in H(G,f) from V+ to V-; move one vertex per arc.
+     Case 2 fallback: when V+ is not accessible to V-, use the proof's solo-edge
+     argument. We find a vertex in an accessible class that can be swapped with
+     a vertex in B to shrink V+.  If even that fails, we do a direct "Kempe-style"
+     recolor: try every vertex in V+ and move it to the first class with room,
+     then recurse. This is guaranteed to terminate because each swap strictly
+     decreases the gap. */
+  const restoreEquitable = () => {
+    let iter = 0;
+    while (iter++ < 200) {
+      const s = sizes();
+      const mx = Math.max(...s), mn = Math.min(...s);
+      if (mx - mn <= 1) { steps.push(snap('equitable', `Equitable restored. Class sizes: [${s.join(', ')}].`)); return; }
+
+      const aux = buildAux();
+      const path = bfsPath(aux.edges, aux.vPlus, aux.vMinus);
+
+      if (path) {
+        /* ── Case 1: Lemma 2.1 ── */
+        steps.push(snap('aux_path',
+          `Lemma 2.1: V+ = class ${aux.vPlus} (size ${s[aux.vPlus]}), V- = class ${aux.vMinus} (size ${s[aux.vMinus]}). Path in H: ${path.join(' \u2192 ')}.`,
+          { auxPath: path }));
+        for (let j = 0; j < path.length - 1; j++) {
+          const y = movable(path[j], path[j + 1]);
+          if (y === null) { steps.push(snap('error', `Lemma 2.1 error: no movable vertex ${path[j]}\u2192${path[j+1]}.`)); return; }
+          col[y] = path[j + 1];
+          steps.push(snap('lemma_move',
+            `Lemma 2.1: move vertex ${y} from class ${path[j]} \u2192 class ${path[j + 1]}.`,
+            { movedVertex: y, fromClass: path[j], toClass: path[j + 1], auxPath: path }));
+        }
+        continue; /* re-check sizes after moves */
+      }
+
+      /* ── Case 2 fallback ── */
+      /* V+ is NOT accessible to V-.  Per the proof, there exist accessible
+         classes (A) and non-accessible classes (B).  We look for any vertex
+         in the largest class that can be moved to any smaller class.  Since
+         d(v) <= r < k, such a target always exists; the issue is it may
+         overfill the target.  By picking the smallest legal target we
+         make the most progress. */
+      steps.push(snap('no_path',
+        `Case 2: V+ = class ${aux.vPlus} not accessible to V- = class ${aux.vMinus}. Applying direct rebalancing.`));
+
+      const vPlusClass = aux.vPlus;
+      const vMinusClass = aux.vMinus;
+      const nodesVP = inClass(vPlusClass);
+      let moved = false;
+
+      /* Strategy 1: try to move a vertex directly from V+ to V- (the smallest class). */
+      for (const v of nodesVP) {
+        if (!hasNbr(v, vMinusClass)) {
+          col[v] = vMinusClass;
+          steps.push(snap('lemma_move',
+            `Case 2: move vertex ${v} from class ${vPlusClass} \u2192 class ${vMinusClass} (direct V+\u2192V-).`,
+            { movedVertex: v, fromClass: vPlusClass, toClass: vMinusClass }));
+          moved = true;
+          break;
+        }
+      }
+
+      /* Strategy 2: Kempe-chain swap. Find v in V+ that can go to some
+         intermediate class mid, then find w in mid that can go to V-. */
+      if (!moved) {
+        for (const v of nodesVP) {
+          for (let mid = 0; mid < k; mid++) {
+            if (mid === vPlusClass || mid === vMinusClass) continue;
+            if (hasNbr(v, mid)) continue;
+            /* temporarily move v to mid */
+            col[v] = mid;
+            const w = movable(mid, vMinusClass);
+            if (w !== null && w !== v) {
+              col[w] = vMinusClass;
+              steps.push(snap('lemma_move',
+                `Case 2 chain: vertex ${v} class ${vPlusClass}\u2192${mid}, vertex ${w} class ${mid}\u2192${vMinusClass}.`,
+                { movedVertex: v, fromClass: vPlusClass, toClass: mid }));
+              moved = true;
+              break;
+            }
+            col[v] = vPlusClass; /* undo */
+          }
+          if (moved) break;
+        }
+      }
+
+      /* Strategy 3: move v from V+ to ANY class strictly smaller than V+.
+         Pick the smallest available target.  This changes H's structure so
+         the next iteration's BFS may succeed where this one failed. */
+      if (!moved) {
+        const targets = Array.from({ length: k }, (_, c) => c)
+          .filter(c => c !== vPlusClass && s[c] < s[vPlusClass])
+          .sort((a, b) => s[a] - s[b]);
+        for (const v of nodesVP) {
+          for (const t of targets) {
+            if (!hasNbr(v, t)) {
+              col[v] = t;
+              steps.push(snap('lemma_move',
+                `Case 2 fallback: move vertex ${v} from class ${vPlusClass} \u2192 class ${t}.`,
+                { movedVertex: v, fromClass: vPlusClass, toClass: t }));
+              moved = true;
+              break;
+            }
+          }
+          if (moved) break;
+        }
+      }
+
+      if (!moved) {
+        steps.push(snap('error', `Could not fully equitize. Sizes: [${sizes().join(',')}].`));
+        return;
+      }
+    }
+    steps.push(snap('error', 'Equitability loop limit reached.'));
+  };
+
+  /* Theorem 3.2 main loop */
+  steps.push(snap('init', `G\u2080 is edgeless. Initial mod-${k} coloring assigns vertex v to class (v mod ${k}). r = ${r}, k = ${k}, n = ${n}.`));
+
+  for (let i = 1; i < n; i++) {
+    const vi = ids[i];
+    const prev = new Set(ids.slice(0, i));
+    const newE = edgesList.filter((e) => (e.a === vi && prev.has(e.b)) || (e.b === vi && prev.has(e.a)));
+
+    if (newE.length === 0) { steps.push(snap('skip', `Process v\u2081\u2080 = vertex ${vi}. No new edges to add.`, { processingVertex: vi })); continue; }
+
+    steps.push(snap('process', `Process vertex ${vi}. Adding ${newE.length} edge(s): ${newE.map((e) => `{${e.a},${e.b}}`).join(', ')}.`, { processingVertex: vi }));
+
+    for (const e of newE) {
+      active.push({ a: Math.min(e.a, e.b), b: Math.max(e.a, e.b) });
+      adjW.get(e.a).add(e.b);
+      adjW.get(e.b).add(e.a);
+      steps.push(snap('add_edge', `Added edge {${e.a},${e.b}}.`, { currentEdge: e, processingVertex: vi }));
+    }
+
+    const viC = col[vi];
+    let conflict = null;
+    for (const nb of adjW.get(vi)) if (col[nb] === viC) { conflict = nb; break; }
+
+    if (conflict === null) {
+      steps.push(snap('ok', `Vertex ${vi} (class ${viC}) has no same-class neighbor. Coloring remains proper.`, { processingVertex: vi }));
+      continue;
+    }
+
+    steps.push(snap('conflict',
+      `CONFLICT: edge {${Math.min(vi, conflict)},${Math.max(vi, conflict)}} is monochromatic (both class ${viC}).`,
+      { conflictEdge: { a: Math.min(vi, conflict), b: Math.max(vi, conflict) }, processingVertex: vi }));
+
+    let tgt = -1;
+    for (let c = 0; c < k; c++) if (c !== viC && !hasNbr(vi, c)) { tgt = c; break; }
+    if (tgt === -1) { steps.push(snap('error', `Cannot resolve: vertex ${vi} has neighbours in every class.`)); continue; }
+
+    col[vi] = tgt;
+    steps.push(snap('move',
+      `Move vertex ${vi}: class ${viC} \u2192 class ${tgt}. Coloring is now nearly equitable.`,
+      { movedVertex: vi, fromClass: viC, toClass: tgt, processingVertex: vi }));
+
+    restoreEquitable();
+  }
+
+  steps.push(snap('done', `Algorithm complete. Equitable (r+1)-coloring found. r = ${r}, k = ${k}. Final sizes: [${sizes().join(', ')}].`));
+  return steps;
+}
+
+/* ════════════════════════ COMPONENT ════════════════════════ */
+export default function HSAlgo() {
+  /* ─── state ─── */
+  const [nodes, setNodes] = useState([]);
+  const [edges, setEdges] = useState([]);
+  const [coloring, setColoring] = useState({});
+  const [maxDeg, setMaxDeg] = useState(3);
+
+  const [connectMode, setConnectMode] = useState(false);
+  const [connectSrc, setConnectSrc] = useState(null);
+
+  const [dragId, setDragId] = useState(null);
+  const [dragOff, setDragOff] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
 
-  // History (nodes-only, unchanged)
-  const [history, setHistory] = useState([]);
-  const [currentStep, setCurrentStep] = useState(0);
+  const [hsSteps, setHsSteps] = useState([]);
+  const [hsIdx, setHsIdx] = useState(-1);
+  const [hsPlaying, setHsPlaying] = useState(false);
+  const [hsSpeed, setHsSpeed] = useState(1200);
 
-  // Max degree & coloring UI
-  const [enforceMaxDegree, setEnforceMaxDegree] = useState(false);
-  const [maxDegree, setMaxDegree] = useState('');
+  const [bulkText, setBulkText] = useState('');
+  const [nodeCount, setNodeCount] = useState('');
+  const [toast, setToast] = useState('');
+  const [builderOpen, setBuilderOpen] = useState(true);
 
-  // Info banner
-  const [info, setInfo] = useState('');
-
-  const width = 800;
-  const height = 500;
   const svgRef = useRef(null);
+  const W = 820, H = 520;
 
-  // ---- NEW: coloring state + helpers ----
-  // class index in [0..r] for each node id
-  const [coloring, setColoring] = useState({}); // { [nodeId]: classIndex }
-  const [auxGraphNodes, setAuxGraphNodes] = useState([]); // { id: classIdx, size: count, type: 'large' | 'small' | 'normal' }
-  const [auxGraphEdges, setAuxGraphEdges] = useState([]); // { from: classIdx, to: classIdx }
-  const [auxGraphPath, setAuxGraphPath] = useState([]);   // [classIdx, classIdx, ...]
-  const [lemmaStatus, setLemmaStatus] = useState(''); // Info banner for lemma ops
+  /* ─── derived ─── */
+  const r = maxDeg;
+  const k = r + 1;
+  const pal = useMemo(() => palette(k), [k]);
 
+  const adj = useMemo(() => {
+    const m = new Map();
+    nodes.forEach((n) => m.set(n.id, new Set()));
+    edges.forEach(({ a, b }) => { m.get(a)?.add(b); m.get(b)?.add(a); });
+    return m;
+  }, [nodes, edges]);
 
-  const mod = (a, m) => ((a % m) + m) % m;
+  const actualMaxDeg = useMemo(() => {
+    let mx = 0;
+    for (const [, s] of adj) mx = Math.max(mx, s.size);
+    return mx;
+  }, [adj]);
 
-  //helper fns
-  const normalizeEdge = (u, v) => {
-    const a = Math.min(u, v), b = Math.max(u, v);
-    return `${a}-${b}`;
-  };
+  const classSizes = useMemo(() => {
+    const s = Array(k).fill(0);
+    nodes.forEach((n) => { const c = coloring[n.id]; if (c != null && c >= 0 && c < k) s[c]++; });
+    return s;
+  }, [nodes, coloring, k]);
 
-  const buildAddEdgeFn = (r, ids) => {
-    const deg = new Map(ids.map(id => [id, 0]));
-    const seen = new Set();
-    const out = [];
+  const isEquitable = useMemo(() => {
+    if (nodes.length === 0) return true;
+    return Math.max(...classSizes) - Math.min(...classSizes) <= 1;
+  }, [classSizes, nodes.length]);
 
-    const addEdge = (u, v) => {
-      if (u === v) return false;
-      const key = normalizeEdge(u, v);
-      if (seen.has(key)) return false;
-      if ((deg.get(u) ?? 0) >= r || (deg.get(v) ?? 0) >= r) return false;
-      seen.add(key);
-      out.push({ a: Math.min(u, v), b: Math.max(u, v) });
-      deg.set(u, (deg.get(u) ?? 0) + 1);
-      deg.set(v, (deg.get(v) ?? 0) + 1);
-      return true;
-    };
+  const conflictCount = useMemo(() =>
+    edges.filter(({ a, b }) => coloring[a] != null && coloring[a] === coloring[b]).length,
+  [edges, coloring]);
 
-    return { addEdge, out, deg, seen };
-  };
+  /* snapshot display */
+  const curStep = hsIdx >= 0 && hsIdx < hsSteps.length ? hsSteps[hsIdx] : null;
+  const dispEdges = curStep ? curStep.edges : edges;
+  const dispColoring = curStep ? curStep.coloring : coloring;
+  const hl = curStep?.highlight ?? {};
+  const auxG = curStep?.auxGraph ?? { nodes: [], edges: [], path: [] };
 
-  //leetcode style edge i/o
-  const parseBulkEdges = (text) => {
-    return text
-      .split(/[,\n]+/)
-      .map(s => s.trim())
-      .filter(Boolean)
-      .map(pair => {
-        const m = pair.match(/^(\d+)\s*[-:]\s*(\d+)$/);
-        if (!m) throw new Error(`Invalid pair: "${pair}" (use "u-v")`);
-        return [parseInt(m[1], 10), parseInt(m[2], 10)];
-      });
-  };
-
-  //---------------------------------------------------------------------------
-
-  // k = r+1 if enforced and valid
-  const k = useMemo(() => {
-    const rInt = parseInt(maxDegree, 10);
-    if (!enforceMaxDegree || isNaN(rInt) || rInt < 0) return 0;
-    return rInt + 1;
-  }, [enforceMaxDegree, maxDegree]);
-
-  // Palette for k classes
-  const colorPalette = useMemo(() => {
-    if (!k) return [];
-    return Array.from({ length: k }, (_, i) =>
-      `hsl(${Math.round((360 * i) / k)}, 70%, 55%)`
-    );
-  }, [k]);
-
-  // Keep coloring defined for all nodes & within range when k changes
+  /* keep coloring in sync with k / nodes */
   useEffect(() => {
-    if (!k) return; // nothing to color
-    setColoring(prev => {
-      const next = { ...prev };
+    if (!k) return;
+    setColoring((prev) => {
+      const next = {};
       let changed = false;
       for (const n of nodes) {
-        if (next[n.id] == null) {
-          next[n.id] = mod(n.id - 1, k); // trivial starting assignment
-          changed = true;
-        } else if (next[n.id] >= k || next[n.id] < 0) {
-          next[n.id] = mod(next[n.id], k);
-          changed = true;
-        }
+        const old = prev[n.id];
+        if (old != null && old >= 0 && old < k) { next[n.id] = old; }
+        else { next[n.id] = n.id % k; changed = true; }
       }
-      // drop stale entries
-      for (const idStr of Object.keys(next)) {
-        const id = Number(idStr);
-        if (!nodes.some(n => n.id === id)) {
-          delete next[idStr];
-          changed = true;
-        }
-      }
+      if (Object.keys(prev).length !== Object.keys(next).length) changed = true;
       return changed ? next : prev;
     });
   }, [nodes, k]);
 
-
-  // 1. Adjacency Map for G
-  const adjMap = useMemo(() => {
-    const map = new Map();
-    nodes.forEach(n => map.set(n.id, new Set()));
-    edges.forEach(e => {
-      map.get(e.a)?.add(e.b);
-      map.get(e.b)?.add(e.a);
-    });
-    return map;
-  }, [nodes, edges]);
-
-  // 2. Nodes Grouped by Color Class
-  const nodesByColorMap = useMemo(() => {
-    const map = new Map();
-    if (!k) return map;
-    // Ensure all classes exist in the map
-    for (let i = 0; i < k; i++) {
-      map.set(i, []);
-    }
-    // Populate with nodes
-    nodes.forEach(n => {
-      const c = coloring[n.id];
-      if (c != null) {
-        map.get(c)?.push(n.id);
-      }
-    });
-    return map;
-  }, [nodes, coloring, k]);
-
-  //3. Class sizes from current coloring
-  const currentColorCounts = useMemo(() => {
-    if (!k) return [];
-    const counts = Array.from({ length: k }, () => 0);
-    nodes.forEach(n => {
-      const c = coloring[n.id];
-      if (c != null && c >= 0 && c < k) counts[c]++;
-    });
-    return counts;
-  }, [nodes, coloring, k]);
-
-  // 4. Target equitable sizes
-  const { q_base, r_rem } = useMemo(() => {
-    if (k === 0 || nodes.length === 0) return { q_base: 0, r_rem: 0 };
-    const n = nodes.length;
-    return {
-      q_base: Math.floor(n / k),
-      r_rem: n % k
-    };
-  }, [nodes.length, k]);
-
-
-  // Helper to find a movable vertex from vFrom to vTo
-  const findMovableVertex = useCallback((vFrom, vTo, adj, nodesByColor) => {
-    const nodesInVFrom = nodesByColor.get(vFrom) || [];
-    const nodesInVTo = nodesByColor.get(vTo) || [];
-    const nodesInVToSet = new Set(nodesInVTo);
-
-    for (const nodeId_y of nodesInVFrom) {
-      const neighborsOfY = adj.get(nodeId_y) || new Set();
-      let hasNeighborInVTo = false;
-      
-      // Check for neighbors
-      for (const neighbor of neighborsOfY) {
-        if (nodesInVToSet.has(neighbor)) {
-          hasNeighborInVTo = true;
-          break;
-        }
-      }
-
-      if (!hasNeighborInVTo) {
-        return nodeId_y; // Found a movable vertex
-      }
-    }
-    return null; // No movable vertex found
+  /* toast helper */
+  const flash = useCallback((msg) => {
+    setToast(msg);
+    const t = setTimeout(() => setToast(''), 4500);
+    return () => clearTimeout(t);
   }, []);
 
-  // // === LEMMA 2.1 IMPLEMENTATION ===
-  // const runLemma2_1 = () => {
-  //   // --- 1. PRECONDITIONS ---
-  //   if (!k || k < 2) {
-  //     setLemmaStatus('Error: Enable "Enforce Max Degree" with r >= 1 (k >= 2).');
-  //     return;
-  //   }
-  //   if (nodes.length === 0) {
-  //     setLemmaStatus('Error: Add nodes to the graph.');
-  //     return;
-  //   }
-  //   setLemmaStatus('Starting... 1. Resolving conflicts (Greedy Proper Coloring)...');
+  /* ─── graph ops ─── */
+  const nextId = () => (nodes.length === 0 ? 0 : Math.max(...nodes.map((n) => n.id)) + 1);
 
-  //   // --- NEW STEP 2: Resolve Conflicts (Greedy Coloring) ---
-  //   // This ensures the coloring 'f' is "proper" before we check if it's equitable.
-  //   const newProperColoring = {};
-  //   const sortedNodes = [...nodes].sort((a, b) => a.id - b.id);
-  //   const localAdjMap = adjMap; // Use memoized version
-    
-  //   for (const node of sortedNodes) {
-  //     const neighbors = localAdjMap.get(node.id) || new Set();
-  //     const neighborColors = new Set();
-      
-  //     for (const neighborId of neighbors) {
-  //       // As we build the new coloring, check against it.
-  //       // This is a standard greedy approach.
-  //       if (newProperColoring[neighborId] != null) {
-  //         neighborColors.add(newProperColoring[neighborId]);
-  //       }
-  //     }
-      
-  //     let assignedColor = -1;
-  //     for (let c = 0; c < k; c++) {
-  //       if (!neighborColors.has(c)) {
-  //         assignedColor = c;
-  //         break;
-  //       }
-  //     }
-      
-  //     if (assignedColor === -1) {
-  //       // This shouldn't happen if k = r+1 and deg(node) <= r.
-  //       // But as a fallback, just assign 0. This indicates a failed proper coloring.
-  //       assignedColor = 0; 
-  //       setLemmaStatus(`Warning: Could not find proper color for node ${node.id}. Greedy algorithm failed.`);
-  //       // Don't return, as we might still be able to make it equitable.
-  //     }
-      
-  //     newProperColoring[node.id] = assignedColor;
-  //   }
-    
-  //   // Apply the new proper coloring
-  //   setColoring(newProperColoring);
-  //   setLemmaStatus('1. Proper coloring applied. 2. Analyzing for equitability...');
-    
-  //   // --- 3. CALCULATE COUNTS *AFTER* GREEDY PASS ---
-  //   // We must wait for the state update, or recalculate manually.
-  //   // Let's recalculate manually to avoid async issues.
-  //   const newCounts = Array(k).fill(0);
-  //   for (const nodeId of Object.keys(newProperColoring)) {
-  //     newCounts[newProperColoring[nodeId]]++;
-  //   }
-  //   const newNodesByColor = new Map();
-  //   for (let i = 0; i < k; i++) newNodesByColor.set(i, []);
-  //   for (const nodeId of Object.keys(newProperColoring)) {
-  //     newNodesByColor.get(newProperColoring[nodeId]).push(Number(nodeId));
-  //   }
-
-  //   // --- 4. FIND V+ and V- (from new proper coloring) ---
-  //   let vPlusId = -1, vMinusId = -1;
-  //   let maxSize = -1, minSize = Infinity;
-    
-  //   newCounts.forEach((count, idx) => {
-  //     if (count > maxSize) {
-  //       maxSize = count;
-  //       vPlusId = idx;
-  //     }
-  //     if (count < minSize) {
-  //       minSize = count;
-  //       vMinusId = idx;
-  //     }
-  //   });
-    
-  //   // Check if coloring is already equitable or close
-  //   if (maxSize <= minSize + 1) {
-  //     setLemmaStatus(`Proper coloring is already equitable (Max: ${maxSize}, Min: ${minSize}). No further action.`);
-  //     setAuxGraphNodes([]);
-  //     setAuxGraphEdges([]);
-  //     setAuxGraphPath([]);
-  //     return;
-  //   }
-    
-  //   setLemmaStatus(`Proper coloring is nearly equitable: V+ = ${vPlusId} (size ${maxSize}), V- = ${vMinusId} (size ${minSize}). Building H(G, f)...`);
-
-  //   // --- 5. BUILD H(G, f) (based on new proper coloring) ---
-  //   const auxNodes = [];
-  //   const auxEdges = [];
-  //   const localNodesByColor = newNodesByColor; // Use manually calculated map
-    
-  //   for (let i = 0; i < k; i++) {
-  //     let type = 'normal';
-  //     if (i === vPlusId) type = 'large';
-  //     if (i === vMinusId) type = 'small';
-  //     auxNodes.push({ id: i, size: newCounts[i], type });
-  //   }
-
-  //   for (let i = 0; i < k; i++) {
-  //     for (let j = 0; j < k; j++) {
-  //       if (i === j) continue;
-        
-  //       // Check for edge i -> j
-  //       const movableVertex = findMovableVertex(i, j, localAdjMap, localNodesByColor);
-  //       if (movableVertex !== null) {
-  //         auxEdges.push({ from: i, to: j });
-  //       }
-  //     }
-  //   }
-    
-  //   setAuxGraphNodes(auxNodes);
-  //   setAuxGraphEdges(auxEdges);
-  //   setLemmaStatus(`Built H(G, f). Searching for path ${vPlusId} -> ${vMinusId}...`);
-    
-  //   // --- 6. FIND PATH V+ -> V- ---
-  //   let foundPath = null;
-  //   const queue = [[vPlusId]]; // Queue of paths
-  //   const visited = new Set([vPlusId]);
-    
-  //   const auxAdj = new Map();
-  //   auxEdges.forEach(e => {
-  //     if (!auxAdj.has(e.from)) auxAdj.set(e.from, []);
-  //     auxAdj.get(e.from).push(e.to);
-  //   });
-
-  //   while (queue.length > 0) {
-  //     const currentPath = queue.shift();
-  //     const lastNode = currentPath[currentPath.length - 1];
-
-  //     if (lastNode === vMinusId) {
-  //       foundPath = currentPath;
-  //       break;
-  //     }
-      
-  //     const neighbors = auxAdj.get(lastNode) || [];
-  //     for (const neighbor of neighbors) {
-  //       if (!visited.has(neighbor)) {
-  //         visited.add(neighbor);
-  //         queue.push([...currentPath, neighbor]);
-  //       }
-  //     }
-  //   }
-    
-  //   // --- 7. PROCESS PATH & UPDATE COLORING ---
-  //   if (!foundPath) {
-  //     setLemmaStatus(`V+ (${vPlusId}) is not accessible to V- (${vMinusId}). Cannot apply lemma.`);
-  //     setAuxGraphPath([]);
-  //     return;
-  //   }
-    
-  //   setLemmaStatus(`Path found: ${foundPath.join(' -> ')}. Applying recoloring...`);
-  //   setAuxGraphPath(foundPath);
-    
-  //   const finalColoringFromProper = { ...newProperColoring };
-  //   let finalNodesByColor = new Map(localNodesByColor); // Start with our new proper map
-  //   // Create deep copy of arrays within map
-  //   finalNodesByColor.forEach((val, key) => {
-  //     finalNodesByColor.set(key, [...val]);
-  //   });
-
-  //   const moves = [];
-  //   let possible = true;
-
-  //   for (let j = 0; j < foundPath.length - 1; j++) {
-  //     const vFrom = foundPath[j];
-  //     const vTo = foundPath[j + 1];
-      
-  //     // Find movable vertex based on the *current* state of our move chain
-  //     const y_j = findMovableVertex(vFrom, vTo, localAdjMap, finalNodesByColor);
-      
-  //     if (y_j === null) {
-  //       setLemmaStatus(`Error: Path broken at ${vFrom} -> ${vTo}. No movable vertex found. Aborting.`);
-  //       possible = false;
-  //       break;
-  //     }
-      
-  //     moves.push({ nodeId: y_j, fromClass: vFrom, toClass: vTo });
-      
-  //     // Update our temporary coloring map for the *next* iteration
-  //     const fromList = finalNodesByColor.get(vFrom);
-  //     finalNodesByColor.set(vFrom, fromList.filter(id => id !== y_j));
-  //     finalNodesByColor.get(vTo).push(y_j);
-  //   }
-
-  //   if (possible) {
-  //     // All moves are possible. Apply them to the *real* coloring.
-  //     const finalColoring = { ...finalColoringFromProper };
-  //     moves.forEach(move => {
-  //       finalColoring[move.nodeId] = move.toClass;
-  //     });
-      
-  //     setColoring(finalColoring);
-  //     saveToHistory(nodes, 'Applied Proper Coloring & Lemma 2.1');
-  //     setLemmaStatus(`Proper & Equitable coloring achieved! V+ lost 1, V- gained 1.`);
-      
-  //     // Clear the aux graph after a delay
-  //     // setTimeout(() => {
-  //     //   setLemmaStatus('Aux graph reset. Ready for next operation.');
-  //     //   setAuxGraphNodes([]);
-  //     //   setAuxGraphEdges([]);
-  //     //   setAuxGraphPath([]);
-  //     // }, 3000);
-  //   } else {
-  //     // Reset path if it failed
-  //     setAuxGraphPath([]);
-  //   }
-  // };
-
-  // === LEMMA 2.1 IMPLEMENTATION ===
-  const runLemma2_1 = () => {
-    // --- 1. PRECONDITIONS ---
-    if (!k || k < 2) {
-      setLemmaStatus('Error: Enable "Enforce Max Degree" with r >= 1 (k >= 2).');
-      return;
-    }
-    if (nodes.length === 0) {
-      setLemmaStatus('Error: Add nodes to the graph.');
-      return;
-    }
-    setLemmaStatus('Analyzing coloring...');
-    
-    // --- 2. FIND V+ and V- ---
-    let vPlusId = -1, vMinusId = -1;
-    let maxSize = -1, minSize = Infinity;
-    
-    currentColorCounts.forEach((count, idx) => {
-      if (count > maxSize) {
-        maxSize = count;
-        vPlusId = idx;
-      }
-      if (count < minSize) {
-        minSize = count;
-        vMinusId = idx;
-      }
-    });
-    
-    // Check if coloring is already equitable or close
-    if (maxSize <= minSize + 1) {
-      setLemmaStatus(`Coloring is already equitable (Max: ${maxSize}, Min: ${minSize}). No action taken.`);
-      setAuxGraphNodes([]);
-      setAuxGraphEdges([]);
-      setAuxGraphPath([]);
-      return;
-    }
-    
-    setLemmaStatus(`Nearly equitable: V+ = ${vPlusId} (size ${maxSize}), V- = ${vMinusId} (size ${minSize}). Building H(G, f)...`);
-
-    // --- 3. BUILD H(G, f) ---
-    const auxNodes = [];
-    const auxEdges = [];
-    const localNodesByColor = nodesByColorMap; // Use memoized version
-    const localAdjMap = adjMap; // Use memoized version
-    
-    for (let i = 0; i < k; i++) {
-      let type = 'normal';
-      if (i === vPlusId) type = 'large';
-      if (i === vMinusId) type = 'small';
-      auxNodes.push({ id: i, size: currentColorCounts[i], type });
-    }
-
-    for (let i = 0; i < k; i++) {
-      for (let j = 0; j < k; j++) {
-        if (i === j) continue;
-        
-        // Check for edge i -> j
-        const movableVertex = findMovableVertex(i, j, localAdjMap, localNodesByColor);
-        if (movableVertex !== null) {
-          auxEdges.push({ from: i, to: j });
-        }
-      }
-    }
-    
-    setAuxGraphNodes(auxNodes);
-    setAuxGraphEdges(auxEdges);
-    setLemmaStatus(`Built H(G, f). Searching for path ${vPlusId} -> ${vMinusId}...`);
-    
-    // --- 4. FIND PATH V+ -> V- ---
-    let foundPath = null;
-    const queue = [[vPlusId]]; // Queue of paths
-    const visited = new Set([vPlusId]);
-    
-    const auxAdj = new Map();
-    auxEdges.forEach(e => {
-      if (!auxAdj.has(e.from)) auxAdj.set(e.from, []);
-      auxAdj.get(e.from).push(e.to);
-    });
-
-    while (queue.length > 0) {
-      const currentPath = queue.shift();
-      const lastNode = currentPath[currentPath.length - 1];
-
-      if (lastNode === vMinusId) {
-        foundPath = currentPath;
-        break;
-      }
-      
-      const neighbors = auxAdj.get(lastNode) || [];
-      for (const neighbor of neighbors) {
-        if (!visited.has(neighbor)) {
-          visited.add(neighbor);
-          queue.push([...currentPath, neighbor]);
-        }
-      }
-    }
-    
-    // --- 5. PROCESS PATH & UPDATE COLORING ---
-    if (!foundPath) {
-      setLemmaStatus(`V+ (${vPlusId}) is not accessible to V- (${vMinusId}). Cannot apply lemma.`);
-      setAuxGraphPath([]);
-      return;
-    }
-    
-    setLemmaStatus(`Path found: ${foundPath.join(' -> ')}. Applying recoloring...`);
-    setAuxGraphPath(foundPath);
-
-    // We need to find the *actual* vertices to move.
-    // This is a chain reaction. We must find y_j based on the *updated* coloring.
-    // The proof implies all y_j can be found from the *initial* coloring f.
-    // "Vj contains a vertex yj that has no neighbours in Vj+1"
-    // This is safer.
-    
-    const newColoring = { ...coloring };
-    let finalNodesByColor = new Map(localNodesByColor); // Start with original
-    // Create deep copy of arrays within map
-    finalNodesByColor.forEach((val, key) => {
-      finalNodesByColor.set(key, [...val]);
-    });
-
-    const moves = [];
-    let possible = true;
-
-    for (let j = 0; j < foundPath.length - 1; j++) {
-      const vFrom = foundPath[j];
-      const vTo = foundPath[j + 1];
-      
-      // Find movable vertex based on the *current* state of our move chain
-      const y_j = findMovableVertex(vFrom, vTo, localAdjMap, finalNodesByColor);
-      
-      if (y_j === null) {
-        setLemmaStatus(`Error: Path broken at ${vFrom} -> ${vTo}. No movable vertex found. Aborting.`);
-        possible = false;
-        break;
-      }
-      
-      moves.push({ nodeId: y_j, fromClass: vFrom, toClass: vTo });
-      
-      // Update our temporary coloring map for the *next* iteration
-      const fromList = finalNodesByColor.get(vFrom);
-      finalNodesByColor.set(vFrom, fromList.filter(id => id !== y_j));
-      finalNodesByColor.get(vTo).push(y_j);
-    }
-
-    if (possible) {
-      // All moves are possible. Apply them to the *real* coloring.
-      const finalColoring = { ...coloring };
-      moves.forEach(move => {
-        finalColoring[move.nodeId] = move.toClass;
-      });
-      
-      setColoring(finalColoring);
-      saveToHistory(nodes, 'Applied Lemma 2.1 Recoloring');
-      setLemmaStatus(`Equitable coloring achieved! V+ lost 1, V- gained 1.`);
-      
-      // Clear the aux graph after a delay
-      // setTimeout(() => {
-      //   setLemmaStatus('Aux graph reset. Ready for next operation.');
-      //   setAuxGraphNodes([]);
-      //   setAuxGraphEdges([]);
-      //   setAuxGraphPath([]);
-      // }, 3000);
-    } else {
-      // Reset path if it failed
-      setAuxGraphPath([]);
-    }
-  };
-
-  // History helpers (nodes-only)
-  const saveToHistory = (newNodes, operation = '') => {
-    const timestamp = Date.now();
-    setHistory(prev => [
-      ...prev.slice(0, currentStep),
-      { nodes: newNodes, operation, timestamp }
-    ]);
-    setCurrentStep(prev => prev + 1);
-  };
-
-  const undo = () => {
-    if (currentStep > 0) {
-      const newStep = currentStep - 1;
-      const previousState = history[newStep - 1] || { nodes: [] };
-      setNodes(previousState.nodes);
-      setCurrentStep(newStep);
-      setInfo(`Undone: ${previousState.operation || 'Previous operation'}`);
-    }
-  };
-
-  const redo = () => {
-    if (currentStep < history.length) {
-      const nextState = history[currentStep];
-      setNodes(nextState.nodes);
-      setCurrentStep(prev => prev + 1);
-      setInfo(`Redone: ${nextState.operation || 'Next operation'}`);
-    }
-  };
-
-  // Node ops
-  const addNode = () => {
-    const id = nodes.length > 0 ? Math.max(...nodes.map(n => n.id)) + 1 : 1;
-    const nodeRadius = 25;
-    const minDistance = nodeRadius * 2 + 10;
-
-    let x, y;
-    let attempts = 0;
-    const maxAttempts = 100;
-
-    do {
-      const newX = Math.random() * (width - 80) + 40;
-      const newY = Math.random() * (height - 80) + 40;
-      x = newX;
-      y = newY;
-      attempts++;
-    } while (
-      attempts < maxAttempts &&
-      nodes.some(node => {
-        const distance = Math.hypot(x - node.x, y - node.y);
-        return distance < minDistance;
-      })
-    );
-
-    const newNodes = [...nodes, { id, x, y }];
-    setNodes(newNodes);
-    setEdges([]);
-    saveToHistory(newNodes, `Added node ${id}`);
-    setInfo(`Added node ${id}`);
+  const addNodeAt = (x, y) => {
+    const id = nextId();
+    setNodes((prev) => [...prev, { id, x, y }]);
+    setColoring((prev) => ({ ...prev, [id]: id % k }));
+    flash(`Added vertex ${id}.`);
+    return id;
   };
 
   const addBulkNodes = () => {
-    const count = parseInt(bulkNodeCount, 10);
-    if (isNaN(count) || count <= 0 || count > 50) {
-      alert('Please enter a valid number between 1 and 50');
-      return;
-    }
-
-    const newNodesToAdd = [];
-    const nodeRadius = 25;
-    const minDistance = nodeRadius * 2 + 10;
-    const startId = nodes.length > 0 ? Math.max(...nodes.map(n => n.id)) + 1 : 1;
-
+    const count = parseInt(nodeCount, 10);
+    if (isNaN(count) || count < 1 || count > 100) { flash('Enter a number 1\u2013100.'); return; }
+    const startId = nextId();
+    const cols = Math.ceil(Math.sqrt(count));
+    const gx = cols > 1 ? (W - 140) / (cols - 1) : 0;
+    const rows = Math.ceil(count / cols);
+    const gy = rows > 1 ? (H - 140) / (rows - 1) : 0;
+    const nn = [];
+    const nc = { ...coloring };
     for (let i = 0; i < count; i++) {
       const id = startId + i;
-      let x, y;
-      let attempts = 0;
-      const maxAttempts = 200;
-
-      do {
-        const newX = Math.random() * (width - 80) + 40;
-        const newY = Math.random() * (height - 80) + 40;
-        x = newX;
-        y = newY;
-        attempts++;
-      } while (
-        attempts < maxAttempts &&
-        [...nodes, ...newNodesToAdd].some(node => {
-          const distance = Math.hypot(x - node.x, y - node.y);
-          return distance < minDistance;
-        })
-      );
-
-      newNodesToAdd.push({ id, x, y });
+      nn.push({ id, x: 70 + (i % cols) * gx, y: 70 + Math.floor(i / cols) * gy });
+      nc[id] = id % k;
     }
-
-    const finalNodes = [...nodes, ...newNodesToAdd];
-    setNodes(finalNodes);
-    setEdges([]);
-    setBulkNodeCount('');
-    saveToHistory(finalNodes, `Added ${count} nodes (${startId}-${startId + count - 1})`);
-    setInfo(`Added ${count} nodes`);
+    setNodes((prev) => [...prev, ...nn]);
+    setColoring(nc);
+    setNodeCount('');
+    flash(`Added ${count} vertices (${startId}\u2013${startId + count - 1}).`);
   };
 
-  const deleteNode = () => {
-    const id = parseInt(deleteNodeId, 10);
-    if (isNaN(id)) return;
-    const newNodes = nodes.filter(n => n.id !== id);
-    setNodes(newNodes);
-    setEdges([]);
-    setDeleteNodeId('');
-    saveToHistory(newNodes, `Deleted node ${id}`);
-    setInfo(`Deleted node ${id}`);
+  const deleteNode = (id) => {
+    setNodes((prev) => prev.filter((n) => n.id !== id));
+    setEdges((prev) => prev.filter((e) => e.a !== id && e.b !== id));
+    setColoring((prev) => { const c = { ...prev }; delete c[id]; return c; });
   };
 
-  const clearGraph = () => {
-    setNodes([]);
-    setDeleteNodeId('');
-    setBulkNodeCount('');
-    setDraggedNode(null);
-    setHistory([]);
-    setCurrentStep(0);
-    setEdges([]);
-    setColoring({});
-    setInfo('Graph cleared');
+  const tryAddEdge = useCallback((a, b) => {
+    if (a === b) return false;
+    const ea = Math.min(a, b), eb = Math.max(a, b);
+    if (edges.some((e) => e.a === ea && e.b === eb)) { flash('Edge already exists.'); return false; }
+    const degA = adj.get(a)?.size ?? 0;
+    const degB = adj.get(b)?.size ?? 0;
+    if (degA >= r) { flash(`Vertex ${a} already at max degree ${r}.`); return false; }
+    if (degB >= r) { flash(`Vertex ${b} already at max degree ${r}.`); return false; }
+    setEdges((prev) => [...prev, { a: ea, b: eb }]);
+    flash(`Added edge {${ea},${eb}}.`);
+    return true;
+  }, [edges, adj, r, flash]);
+
+  const clearAll = () => {
+    setNodes([]); setEdges([]); setColoring({});
+    setHsSteps([]); setHsIdx(-1); setHsPlaying(false);
+    setConnectMode(false); setConnectSrc(null);
+    setZoom(1); setPan({ x: 0, y: 0 });
+    flash('Cleared.');
   };
 
-  // Example graph for lemma 2.1
-  const createExampleGraph = () => {
-    const exampleNodes = [
-      { id: 1, x: 100, y: 100 },
-      { id: 2, x: 200, y: 100 },
-      { id: 3, x: 300, y: 100 },
-      { id: 4, x: 400, y: 100 },
-      { id: 5, x: 100, y: 200 },
-      { id: 6, x: 200, y: 200 },
-      { id: 7, x: 300, y: 200 },
-      { id: 8, x: 400, y: 200 },
-      { id: 9, x: 250, y: 300 },
-    ];
-    setNodes(exampleNodes);
-    
-    // Set r=3, k=4
-    setEnforceMaxDegree(true);
-    setMaxDegree('3');
-    const r = 3;
-    const k_val = r + 1;
-    
-    const newColoring = {
-      1: 0, 
-      2: 0, 
-      3: 0, 
-      4: 0, 
-      5: 1, 
-      6: 1, 
-      7: 2, 
-      8: 2, 
-      9: 3, 
-    };
-    setColoring(newColoring);
-    
-    // Create edges that make a path 0 -> 1 -> 3
-    // We need:
-    // 1. A vertex in V+ (0) movable to V_mid (1). 
-    //    Let's make node 1 (in V+) have NO neighbors in V_mid (1) (nodes 5, 6)
-    // 2. A vertex in V_mid (1) movable to V- (3).
-    //    Let's make node 5 (in V_mid 1) have NO neighbors in V- (3) (node 9)
-    // 3. Add other edges to make it a graph.
-    
-    const exampleEdges = [
-      // Edges for node 1 (V+):
-      // No neighbors in {5, 6} (V_mid 1)
-      { a: 1, b: 7 }, // Neighbor in V_mid 2
-      { a: 1, b: 9 }, // Neighbor in V- 3
-      
-      // Edges for node 5 (V_mid 1):
-      // No neighbors in {9} (V- 3)
-      { a: 5, b: 2 }, // Neighbor in V+ 0
-      { a: 5, b: 8 }, // Neighbor in V_mid 2
-      
-      // Other edges to connect
-      { a: 2, b: 3 },
-      { a: 3, b: 4 },
-      { a: 6, b: 7 },
-      { a: 7, b: 8 },
-      { a: 8, b: 9 },
-      { a: 2, b: 6 },
-    ];
-    
-    setEdges(exampleEdges);
-    setBulkEdgesText('');
-    
-    saveToHistory(exampleNodes, 'Created Lemma 2.1 Example');
-    setInfo('Loaded example graph for Lemma 2.1 (r=3, k=4).');
-    setLemmaStatus('Example loaded. V+ is Class 0 (size 4), V- is Class 3 (size 1). Path 0 -> 1 -> 3 should be possible.');
+  const applyModColoring = () => {
+    const c = {};
+    nodes.forEach((n) => { c[n.id] = n.id % k; });
+    setColoring(c);
+    flash(`Applied mod-${k} coloring: vertex v \u2192 class (v mod ${k}).`);
   };
 
-  // Zoom/pan/drag
-  const handleZoom = (delta) => {
-    setZoom(prev => Math.max(0.3, Math.min(5, prev + delta)));
-  };
-
-  const handleWheel = (e) => {
-    if (e.target.closest('svg')) {
-      e.preventDefault();
-      const delta = e.deltaY > 0 ? -0.1 : 0.1;
-      handleZoom(delta);
+  const applyGreedyColoring = () => {
+    const sorted = [...nodes].sort((a, b) => a.id - b.id);
+    const c = {};
+    for (const n of sorted) {
+      const used = new Set();
+      for (const nb of adj.get(n.id) || []) if (c[nb] != null) used.add(c[nb]);
+      for (let cl = 0; cl < k; cl++) { if (!used.has(cl)) { c[n.id] = cl; break; } }
+      if (c[n.id] == null) c[n.id] = 0;
     }
+    setColoring(c);
+    flash('Applied greedy proper coloring.');
   };
 
-  const handlePanStart = (e) => {
-    if (e.target.tagName === 'circle') return;
-    if (isSorting) return;
-    setIsPanning(true);
-    setPanStart({ x: e.clientX, y: e.clientY });
+  /* ─── bulk edges ─── */
+  const applyBulkEdges = () => {
+    if (!bulkText.trim()) { flash('Paste edges like: 0-1, 1-2, 2-3'); return; }
+    const idSet = new Set(nodes.map((n) => n.id));
+    const pairs = [];
+    try {
+      for (const tok of bulkText.split(/[,\n]+/).map((s) => s.trim()).filter(Boolean)) {
+        const m = tok.match(/^(\d+)\s*[-:]\s*(\d+)$/);
+        if (!m) throw new Error(`Invalid: "${tok}"`);
+        pairs.push([parseInt(m[1], 10), parseInt(m[2], 10)]);
+      }
+    } catch (e) { flash(e.message); return; }
+    const deg = new Map([...idSet].map((id) => [id, 0]));
+    const uniq = new Set();
+    const out = [];
+    for (const [u, v] of pairs) {
+      if (!idSet.has(u) || !idSet.has(v)) { flash(`Unknown vertex in ${u}-${v}.`); return; }
+      if (u === v) { flash(`Self-loop: ${u}-${v}.`); return; }
+      const key = `${Math.min(u, v)}-${Math.max(u, v)}`;
+      if (uniq.has(key)) continue;
+      uniq.add(key);
+      const a = Math.min(u, v), b = Math.max(u, v);
+      deg.set(a, deg.get(a) + 1);
+      deg.set(b, deg.get(b) + 1);
+      out.push({ a, b });
+    }
+    for (const [id, d] of deg) if (d > r) { flash(`Vertex ${id} degree ${d} exceeds r=${r}.`); return; }
+    setEdges(out);
+    setBulkText('');
+    flash(`Applied ${out.length} edges.`);
   };
 
-  // Helper to convert screen coordinates to SVG coordinates accounting for zoom/pan
-  const screenToSVG = (svgElement, clientX, clientY) => {
-    if (!svgElement) return { x: 0, y: 0 };
-    
-    const rect = svgElement.getBoundingClientRect();
-    // Get mouse position relative to SVG element
-    const mouseX = clientX - rect.left;
-    const mouseY = clientY - rect.top;
-    
-    // The SVG has a CSS transform: scale(zoom) translate(pan.x, pan.y) with transform-origin: center
-    // The transform origin is the center of the SVG element
-    const centerX = rect.width / 2;
-    const centerY = rect.height / 2;
-    
-    // Reverse the transformation:
-    // 1. Remove pan (pan is in screen pixels)
-    // 2. Get position relative to center
-    // 3. Divide by zoom to reverse scale
-    // 4. Add center back to get absolute position
-    const svgX = ((mouseX - pan.x) - centerX) / zoom + centerX;
-    const svgY = ((mouseY - pan.y) - centerY) / zoom + centerY;
-    
-    return { x: svgX, y: svgY };
-  };
+  /* ─── preset graphs ─── */
+  const PAPER_NODES = [
+    { id: 6, x: 110, y: 70 }, { id: 5, x: 230, y: 70 }, { id: 4, x: 350, y: 70 },
+    { id: 3, x: 470, y: 70 }, { id: 8, x: 640, y: 70 }, { id: 7, x: 110, y: 190 },
+    { id: 0, x: 230, y: 190 }, { id: 1, x: 350, y: 190 }, { id: 2, x: 470, y: 190 },
+    { id: 15, x: 470, y: 310 }, { id: 9, x: 640, y: 310 }, { id: 12, x: 110, y: 430 },
+    { id: 13, x: 230, y: 430 }, { id: 14, x: 350, y: 430 }, { id: 11, x: 470, y: 430 },
+    { id: 10, x: 640, y: 430 },
+  ];
+  const PAPER_EDGES = [
+    { a: 0, b: 1 }, { a: 1, b: 2 }, { a: 2, b: 3 }, { a: 1, b: 4 }, { a: 3, b: 4 },
+    { a: 0, b: 5 }, { a: 4, b: 5 }, { a: 5, b: 6 }, { a: 0, b: 7 }, { a: 6, b: 7 },
+    { a: 3, b: 8 }, { a: 8, b: 9 }, { a: 9, b: 10 }, { a: 10, b: 11 }, { a: 7, b: 12 },
+    { a: 2, b: 13 }, { a: 12, b: 13 }, { a: 11, b: 14 }, { a: 13, b: 14 }, { a: 9, b: 15 },
+    { a: 11, b: 15 }, { a: 14, b: 15 },
+  ];
 
-  const handleMouseDown = (e, node) => {
-    if (isSorting) return;
-    e.preventDefault();
-    e.stopPropagation();
-    
-    const svgElement = svgRef.current;
-    if (!svgElement) return;
-    
-    const svgCoords = screenToSVG(svgElement, e.clientX, e.clientY);
-
-    setDraggedNode(node.id);
-    setDragOffset({
-      x: svgCoords.x - node.x,
-      y: svgCoords.y - node.y
-    });
-  };
-
-  const handleMouseMove = (e) => {
-    if (draggedNode) {
-      e.preventDefault();
-      e.stopPropagation();
-      
-      const svgElement = svgRef.current;
-      if (!svgElement) return;
-      
-      const svgCoords = screenToSVG(svgElement, e.clientX, e.clientY);
-
-      const newX = Math.max(25, Math.min(width - 25, svgCoords.x - dragOffset.x));
-      const newY = Math.max(25, Math.min(height - 25, svgCoords.y - dragOffset.y));
-
-      const newNodes = nodes.map(node =>
-        node.id === draggedNode
-          ? { ...node, x: newX, y: newY }
-          : node
-      );
-      setNodes(newNodes);
-    } else if (isPanning) {
-      const deltaX = e.clientX - panStart.x;
-      const deltaY = e.clientY - panStart.y;
-      setPan(prev => ({
-        x: prev.x + deltaX,
-        y: prev.y + deltaY
+  const loadPreset = (name) => {
+    setHsSteps([]); setHsIdx(-1); setHsPlaying(false);
+    setConnectMode(false); setConnectSrc(null);
+    setZoom(1); setPan({ x: 0, y: 0 });
+    let ns, es, rv;
+    if (name === 'paper') {
+      ns = PAPER_NODES.map((n) => ({ ...n }));
+      es = PAPER_EDGES.map((e) => ({ ...e }));
+      rv = 3;
+    } else if (name === 'petersen') {
+      rv = 3;
+      const R1 = 200, R2 = 90, cx = W / 2, cy = H / 2;
+      ns = Array.from({ length: 10 }, (_, i) => {
+        const angle = (i < 5 ? i : i - 5) * (2 * Math.PI / 5) - Math.PI / 2;
+        const rad = i < 5 ? R1 : R2;
+        return { id: i, x: cx + rad * Math.cos(angle), y: cy + rad * Math.sin(angle) };
+      });
+      es = [
+        { a: 0, b: 1 }, { a: 1, b: 2 }, { a: 2, b: 3 }, { a: 3, b: 4 }, { a: 0, b: 4 },
+        { a: 5, b: 7 }, { a: 7, b: 9 }, { a: 9, b: 6 }, { a: 6, b: 8 }, { a: 5, b: 8 },
+        { a: 0, b: 5 }, { a: 1, b: 6 }, { a: 2, b: 7 }, { a: 3, b: 8 }, { a: 4, b: 9 },
+      ];
+    } else if (name === 'cycle8') {
+      rv = 2;
+      const R = 200, cx = W / 2, cy = H / 2;
+      ns = Array.from({ length: 8 }, (_, i) => ({
+        id: i, x: cx + R * Math.cos(i * Math.PI / 4 - Math.PI / 2), y: cy + R * Math.sin(i * Math.PI / 4 - Math.PI / 2)
       }));
+      es = Array.from({ length: 8 }, (_, i) => ({ a: i, b: (i + 1) % 8 }));
+      es = es.map((e) => ({ a: Math.min(e.a, e.b), b: Math.max(e.a, e.b) }));
+    } else if (name === 'k33') {
+      rv = 3;
+      ns = [
+        { id: 0, x: 200, y: 120 }, { id: 1, x: 400, y: 120 }, { id: 2, x: 600, y: 120 },
+        { id: 3, x: 200, y: 380 }, { id: 4, x: 400, y: 380 }, { id: 5, x: 600, y: 380 },
+      ];
+      es = [];
+      for (let i = 0; i < 3; i++) for (let j = 3; j < 6; j++) es.push({ a: i, b: j });
+    } else return;
+
+    setMaxDeg(rv);
+    setNodes(ns);
+    setEdges(es);
+    const c = {};
+    ns.forEach((n) => { c[n.id] = n.id % (rv + 1); });
+    setColoring(c);
+    flash(`Loaded: ${name === 'paper' ? 'Paper graph (16v, 22e, \u0394=3)' : name === 'petersen' ? 'Petersen graph (10v, 15e, \u0394=3)' : name === 'cycle8' ? 'Cycle C\u2088 (8v, 8e, \u0394=2)' : 'K\u2083,\u2083 (6v, 9e, \u0394=3)'}.`);
+  };
+
+  /* ─── H-S playback ─── */
+  const onCompute = () => {
+    if (nodes.length === 0) { flash('Add vertices first.'); return; }
+    if (actualMaxDeg > r) { flash(`\u0394(G) = ${actualMaxDeg} exceeds r = ${r}. Increase r or remove edges.`); return; }
+    const steps = computeHSSteps(nodes, edges, r, k);
+    setHsSteps(steps);
+    setHsIdx(-1);
+    setHsPlaying(false);
+    flash(`Computed ${steps.length} animation steps.`);
+  };
+
+  const hsForward = () => {
+    if (hsIdx + 1 < hsSteps.length) setHsIdx((i) => i + 1);
+  };
+  const hsBack = () => {
+    if (hsIdx > -1) setHsIdx((i) => i - 1);
+  };
+  const hsRun = () => { if (hsSteps.length > 0) setHsPlaying(true); };
+  const hsPause = () => setHsPlaying(false);
+  const hsReset = () => { setHsPlaying(false); setHsIdx(-1); };
+  const hsJumpToEnd = () => { setHsPlaying(false); setHsIdx(hsSteps.length - 1); };
+
+  useEffect(() => {
+    if (!hsPlaying) return;
+    if (hsIdx + 1 >= hsSteps.length) { setHsPlaying(false); return; }
+    const t = setTimeout(() => setHsIdx((i) => i + 1), hsSpeed);
+    return () => clearTimeout(t);
+  }, [hsPlaying, hsIdx, hsSteps.length, hsSpeed]);
+
+  /* ─── SVG coord helpers ─── */
+  const screenToSVG = useCallback((el, cx, cy) => {
+    if (!el) return { x: 0, y: 0 };
+    const rect = el.getBoundingClientRect();
+    const mx = cx - rect.left, my = cy - rect.top;
+    const cX = rect.width / 2, cY = rect.height / 2;
+    return {
+      x: ((mx - pan.x) - cX) / zoom + cX,
+      y: ((my - pan.y) - cY) / zoom + cY,
+    };
+  }, [zoom, pan]);
+
+  /* ─── interaction ─── */
+  const onNodeClick = useCallback((id) => {
+    if (!connectMode) return;
+    if (connectSrc === null) { setConnectSrc(id); return; }
+    if (connectSrc === id) { setConnectSrc(null); return; }
+    tryAddEdge(connectSrc, id);
+    setConnectSrc(null);
+  }, [connectMode, connectSrc, tryAddEdge]);
+
+  const onMouseDownNode = (e, node) => {
+    e.preventDefault(); e.stopPropagation();
+    if (connectMode) { onNodeClick(node.id); return; }
+    const pt = screenToSVG(svgRef.current, e.clientX, e.clientY);
+    setDragId(node.id);
+    setDragOff({ x: pt.x - node.x, y: pt.y - node.y });
+  };
+
+  const onMouseMove = (e) => {
+    if (dragId !== null) {
+      const pt = screenToSVG(svgRef.current, e.clientX, e.clientY);
+      const nx = Math.max(20, Math.min(W - 20, pt.x - dragOff.x));
+      const ny = Math.max(20, Math.min(H - 20, pt.y - dragOff.y));
+      setNodes((prev) => prev.map((n) => (n.id === dragId ? { ...n, x: nx, y: ny } : n)));
+    } else if (isPanning) {
+      setPan((p) => ({ x: p.x + e.clientX - panStart.x, y: p.y + e.clientY - panStart.y }));
       setPanStart({ x: e.clientX, y: e.clientY });
     }
   };
 
-  const handleMouseUp = () => {
-    if (draggedNode) {
-      saveToHistory(nodes, `Moved node ${draggedNode}`);
-    }
-    setDraggedNode(null);
-    setDragOffset({ x: 0, y: 0 });
-    setIsPanning(false);
+  const onMouseUp = () => { setDragId(null); setIsPanning(false); };
+
+  const onSvgMouseDown = (e) => {
+    if (e.target.closest('g')) return;
+    setIsPanning(true);
+    setPanStart({ x: e.clientX, y: e.clientY });
   };
 
-  // Stats
-  const nodeIds = nodes.map(n => n.id).sort((a, b) => a - b);
-
-  // Fill color from current coloring
-  const getNodeFill = (id) => {
-    if (!k || !colorPalette.length) return '#E5E7EB'; // neutral when not enforced
-    const c = coloring[id];
-    const idx = c == null ? mod(id - 1, k) : c;
-    return colorPalette[idx];
+  const onSvgDblClick = (e) => {
+    if (e.target.closest('g')) return;
+    const pt = screenToSVG(svgRef.current, e.clientX, e.clientY);
+    addNodeAt(pt.x, pt.y);
   };
 
-  // ==== Edge builders from your original code (simulateEdges kept; conflictProne kept) ====
-
-  const simulateEdges = () => {
-    const r = parseInt(maxDegree, 10);
-    const n = nodes.length;
-
-    if (isNaN(r) || r < 0) {
-      setInfo('Enter a non-negative integer for max degree (r).');
-      return;
+  const onWheel = (e) => {
+    if (e.target.closest('svg')) {
+      e.preventDefault();
+      setZoom((z) => Math.max(0.3, Math.min(4, z + (e.deltaY > 0 ? -0.1 : 0.1))));
     }
-    if (n < 2) {
-      setInfo('Add at least 2 nodes to create edges.');
-      return;
-    }
-    if (r === 0) {
-      setInfo('Impossible: r = 0 cannot be connected.');
-      setEdges([]);
-      return;
-    }
-    if (r === 1 && n > 2) {
-      setInfo('Impossible: a connected graph with max degree 1 needs n ≤ 2. Increase r to ≥ 2.');
-      setEdges([]);
-      return;
-    }
+  };
 
-    const ordered = [...nodes].sort((a, b) => a.id - b.id);
-    const ids = ordered.map(n => n.id);
+  /* ─── fill helper ─── */
+  const getFill = (id) => {
+    const c = dispColoring[id];
+    return c != null && c >= 0 && c < pal.length ? pal[c] : '#d1d5db';
+  };
 
-    const deg = new Map(ids.map(id => [id, 0]));
-    const seen = new Set();
-    const out = [];
+  /* ─── aux graph layout ─── */
+  const auxLayout = useMemo(() => {
+    const m = new Map();
+    const count = auxG.nodes.length;
+    if (count === 0) return m;
+    const R = 90, cx = 140, cy = 140;
+    auxG.nodes.forEach((n, i) => {
+      const a = (i / count) * 2 * Math.PI - Math.PI / 2;
+      m.set(n.id, { x: cx + R * Math.cos(a), y: cy + R * Math.sin(a) });
+    });
+    return m;
+  }, [auxG.nodes]);
 
-    const addEdge = (u, v) => {
-      const a = Math.min(u, v), b = Math.max(u, v);
-      if (a === b) return false;
-      const key = `${a}-${b}`;
-      if (seen.has(key)) return false;
-      if ((deg.get(a) ?? 0) >= r || (deg.get(b) ?? 0) >= r) return false;
-      seen.add(key);
-      out.push({ a, b });
-      deg.set(a, (deg.get(a) ?? 0) + 1);
-      deg.set(b, (deg.get(b) ?? 0) + 1);
-      return true;
+  const auxPathSet = useMemo(() => {
+    const s = new Set();
+    for (let i = 0; i < auxG.path.length - 1; i++) s.add(`${auxG.path[i]}-${auxG.path[i + 1]}`);
+    return s;
+  }, [auxG.path]);
+
+  /* ─── step type badge ─── */
+  const stepBadge = (type) => {
+    const map = {
+      init: ['bg-slate-100 text-slate-700', 'INIT'],
+      process: ['bg-indigo-100 text-indigo-700', 'PROCESS'],
+      skip: ['bg-slate-100 text-slate-600', 'SKIP'],
+      add_edge: ['bg-emerald-100 text-emerald-700', 'EDGE'],
+      ok: ['bg-green-100 text-green-700', 'OK'],
+      conflict: ['bg-red-100 text-red-700', 'CONFLICT'],
+      move: ['bg-amber-100 text-amber-700', 'MOVE'],
+      aux_path: ['bg-purple-100 text-purple-700', 'LEMMA 2.1'],
+      lemma_move: ['bg-violet-100 text-violet-700', 'RECOLOR'],
+      equitable: ['bg-emerald-100 text-emerald-700', 'EQUITABLE'],
+      no_path: ['bg-orange-100 text-orange-700', 'CASE 2'],
+      done: ['bg-green-100 text-green-800', 'DONE'],
+      error: ['bg-red-100 text-red-700', 'ERROR'],
     };
-
-    // 1) Base path to guarantee connectivity (works for r >= 2 or n=2,r=1)
-    for (let i = 0; i < ids.length - 1; i++) {
-      addEdge(ids[i], ids[i + 1]);
-    }
-
-    // 2) Add extra local edges without violating the cap: i -> i+s where s=2..r
-    for (let s = 2; s <= r; s++) {
-      for (let i = 0; i < ids.length; i++) {
-        const j = i + s;
-        if (j >= ids.length) break; // no wrap
-        addEdge(ids[i], ids[j]);
-      }
-    }
-
-    setEdges(out);
-    setInfo(`Built a connected graph with max degree ≤ ${r} (${out.length} edges).`);
+    const [cls, label] = map[type] || ['bg-slate-100 text-slate-600', type];
+    return <span className={`inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${cls}`}>{label}</span>;
   };
 
-  const applyBulkEdgesFromText = () => {
-    const r = parseInt(maxDegree, 10);
-    if (isNaN(r) || r < 0) {
-      alert('Enter a non-negative integer for max degree (r).');
-      return;
-    }
-    if (nodes.length < 2) {
-      alert('Add at least 2 nodes before adding edges.');
-      return;
-    }
-    if (!bulkEdgesText.trim()) {
-      alert('Paste edges like: 1-2, 2-3, 5-1');
-      return;
-    }
-
-    // Known node IDs
-    const ids = new Set(nodes.map(n => n.id));
-
-    let pairs;
-    try {
-      pairs = parseBulkEdges(bulkEdgesText);
-    } catch (e) {
-      alert(e.message);
-      return;
-    }
-
-    // Validate node existence and duplicates/self-loops
-    const unique = new Set();
-    for (const [u, v] of pairs) {
-      if (!ids.has(u) || !ids.has(v)) {
-        alert(`Edge uses unknown node: ${u}-${v}`);
-        return;
-      }
-      if (u === v) {
-        alert(`Self-loop not allowed: ${u}-${v}`);
-        return;
-      }
-      const key = normalizeEdge(u, v);
-      if (unique.has(key)) continue;
-      unique.add(key);
-    }
-
-    // Degree accounting
-    const deg = new Map([...ids].map(id => [id, 0]));
-    for (const key of unique) {
-      const [a, b] = key.split('-').map(Number);
-      deg.set(a, deg.get(a) + 1);
-      deg.set(b, deg.get(b) + 1);
-    }
-
-    // Check constraints
-    for (const id of ids) {
-      const d = deg.get(id) ?? 0;
-      if (d === 0) {
-        alert(`Every node must have at least one edge. Node ${id} has 0.`);
-        return;
-      }
-      if (r >= 0 && d > r) {
-        alert(`Max degree r=${r} violated at node ${id} (deg=${d}).`);
-        return;
-      }
-    }
-
-    // All good → apply
-    const out = [...unique].map(key => {
-      const [a, b] = key.split('-').map(Number);
-      return { a, b };
-    });
-
-    setEdges(out);
-    saveToHistory(nodes, 'Applied bulk predefined edges');
-    setInfo(`Applied ${out.length} predefined edges.`);
-  };
-
-  const buildConflictProneEdges = () => {
-    const r = parseInt(maxDegree, 10);
-    const n = nodes.length;
-
-    if (!enforceMaxDegree) {
-      alert('Enable "Enforce Max Degree" and set r first.');
-      return;
-    }
-    if (isNaN(r) || r < 1) {
-      alert('Enter r > 1 to build conflict-prone edges.');
-      return;
-    }
-    if (n < 2) {
-      alert('Add at least 2 nodes.');
-      return;
-    }
-
-    const ordered = [...nodes].sort((a, b) => a.id - b.id);
-    const ids = ordered.map(n => n.id);
-    const { addEdge, out, deg } = buildAddEdgeFn(r, ids);
-
-    const kLocal = r + 1;
-    const clsOf = (id) => mod(id - 1, kLocal);
-
-    // Group ids by color class
-    const groups = Array.from({ length: kLocal }, () => []);
-    for (const id of ids) groups[clsOf(id)].push(id);
-
-    // STEP 1: Within-class simple chains only (NO cross-class edges here)
-    for (const g of groups) {
-      for (let i = 0; i + 1 < g.length; i++) {
-        addEdge(g[i], g[i + 1]);
-      }
-    }
-
-    // Helper: pick lowest-degree available node from a class
-    const pickFromClass = (c) => {
-      const avail = groups[c].filter(u => (deg.get(u) ?? 0) < r);
-      if (avail.length === 0) return null;
-      // lowest degree first; stable by id
-      avail.sort((a, b) => {
-        const da = deg.get(a) ?? 0, db = deg.get(b) ?? 0;
-        return da - db || a - b;
-      });
-      return avail[0];
-    };
-
-    // STEP 4: EXACTLY ONE CROSS-CLASS EDGE PER CLASS PAIR
-    for (let c1 = 0; c1 < kLocal; c1++) {
-      for (let c2 = c1 + 1; c2 < kLocal; c2++) {
-        if (groups[c1].length === 0 || groups[c2].length === 0) continue;
-
-        let u = pickFromClass(c1);
-        let v = pickFromClass(c2);
-
-        if (u == null || v == null) {
-          alert(
-            `Cannot place the required single cross-class edge between classes ${c1} and ${c2} without exceeding r=${r}.`
-          );
-          return;
-        }
-
-        if (!addEdge(u, v)) {
-          const cand1 = groups[c1]
-            .filter(x => (deg.get(x) ?? 0) < r)
-            .sort((a, b) => (deg.get(a) ?? 0) - (deg.get(b) ?? 0) || a - b);
-          const cand2 = groups[c2]
-            .filter(x => (deg.get(x) ?? 0) < r)
-            .sort((a, b) => (deg.get(a) ?? 0) - (deg.get(b) ?? 0) || a - b);
-
-          let placed = false;
-          for (const x of cand1) {
-            if (placed) break;
-            for (const y of cand2) {
-              if (addEdge(x, y)) { placed = true; break; }
-            }
-          }
-          if (!placed) {
-            alert(
-              `Unable to place the single cross-class edge between classes ${c1} and ${c2} within degree cap r=${r}.`
-            );
-            return;
-          }
-        }
-      }
-    }
-
-    setEdges(out);
-    saveToHistory(nodes, 'Conflict edges: within-class chains + exactly one edge per class pair');
-    setInfo(
-      `Built ${out.length} edges: within-class chains; exactly one edge for each pair of color classes; degree ≤ ${r}.`
-    );
-  };
-
-  const clearEdges = () => {
-    setEdges([]);
-    setInfo('Cleared all edges.');
-  };
-
-  // yo chai change garera tyo color grp ko logic lagau ne
-  const sortNodesAnimated = () => {
-    if (nodes.length === 0) return;
-
-    const cols = 5;
-    const marginX = 60;
-    const marginY = 60;
-    const usableW = Math.max(0, width - 2 * marginX);
-    const usableH = Math.max(0, height - 2 * marginY);
-
-    const ordered = [...nodes].sort((a, b) => a.id - b.id);
-    const n = ordered.length;
-    const rows = Math.max(1, Math.ceil(n / cols));
-
-    const gapX = cols > 1 ? usableW / (cols - 1) : 0;
-    const gapY = rows > 1 ? usableH / (rows - 1) : 0;
-
-    const target = new Map();
-    for (let idx = 0; idx < n; idx++) {
-      const row = Math.floor(idx / cols);
-      const col = idx % cols;
-      const x = marginX + col * gapX;
-      const y = marginY + row * gapY;
-      target.set(ordered[idx].id, { x, y });
-    }
-
-    const start = new Map(nodes.map(n => [n.id, { x: n.x, y: n.y }]));
-    const duration = 700; // ms
-    const startTs = performance.now();
-    const easeInOutCubic = (t) =>
-      t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-
-    setIsSorting(true);
-    setShowSortGuide(true);
-
-    const step = (now) => {
-      const t = Math.min(1, (now - startTs) / duration);
-      const e = easeInOutCubic(t);
-
-      const newNodes = nodes.map(n => {
-        const s = start.get(n.id);
-        const g = target.get(n.id);
-        if (!s || !g) return n;
-        return {
-          ...n,
-          x: s.x + (g.x - s.x) * e,
-          y: s.y + (g.y - s.y) * e
-        };
-      });
-
-      setNodes(newNodes);
-
-      if (t < 1) {
-        requestAnimationFrame(step);
-      } else {
-        setIsSorting(false);
-        setTimeout(() => setShowSortGuide(false), 500);
-        saveToHistory(newNodes, 'Sorted nodes by ID (grid 5-per-row)');
-        setInfo('Nodes sorted by ID into rows of 5.');
-      }
-    };
-
-    requestAnimationFrame(step);
-  };
-
-  // Group nodes by color classes
-  const groupByColorClasses = () => {
-    if (nodes.length === 0) return;
-    if (!k || k === 0) {
-      setInfo('Enable "Enforce Max Degree" and set max degree to group by color classes.');
-      return;
-    }
-
-    const marginX = 60;
-    const marginY = 60;
-    const usableW = Math.max(0, width - 2 * marginX);
-    const usableH = Math.max(0, height - 2 * marginY);
-
-    // Group nodes by their color class
-    const nodesByClass = new Map();
-    for (let i = 0; i < k; i++) {
-      nodesByClass.set(i, []);
-    }
-
-    nodes.forEach(n => {
-      const c = coloring[n.id];
-      if (c != null && c >= 0 && c < k) {
-        nodesByClass.get(c).push(n);
-      } else {
-        // Fallback: assign to class 0 if no color assigned
-        nodesByClass.get(0).push(n);
-      }
-    });
-
-    // Sort nodes within each class by ID for consistency
-    nodesByClass.forEach((nodeList, classIdx) => {
-      nodeList.sort((a, b) => a.id - b.id);
-    });
-
-    // Arrange nodes: each color class gets its own column
-    const cols = k;
-    const gapX = cols > 1 ? usableW / (cols - 1) : 0;
-
-    const target = new Map();
-    let maxNodesInClass = 0;
-    nodesByClass.forEach((nodeList) => {
-      maxNodesInClass = Math.max(maxNodesInClass, nodeList.length);
-    });
-
-    nodesByClass.forEach((nodeList, classIdx) => {
-      const x = marginX + classIdx * gapX;
-      const rows = Math.max(1, nodeList.length);
-      const gapY = rows > 1 ? usableH / (rows - 1) : 0;
-
-      nodeList.forEach((node, idx) => {
-        const y = marginY + idx * gapY;
-        target.set(node.id, { x, y });
-      });
-    });
-
-    const start = new Map(nodes.map(n => [n.id, { x: n.x, y: n.y }]));
-    const duration = 700; // ms
-    const startTs = performance.now();
-    const easeInOutCubic = (t) =>
-      t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-
-    setIsSorting(true);
-    setShowSortGuide(true);
-
-    const step = (now) => {
-      const t = Math.min(1, (now - startTs) / duration);
-      const e = easeInOutCubic(t);
-
-      const newNodes = nodes.map(n => {
-        const s = start.get(n.id);
-        const g = target.get(n.id);
-        if (!s || !g) return n;
-        return {
-          ...n,
-          x: s.x + (g.x - s.x) * e,
-          y: s.y + (g.y - s.y) * e
-        };
-      });
-
-      setNodes(newNodes);
-
-      if (t < 1) {
-        requestAnimationFrame(step);
-      } else {
-        setIsSorting(false);
-        setTimeout(() => setShowSortGuide(false), 500);
-        saveToHistory(newNodes, 'Grouped nodes by color classes');
-        setInfo(`Nodes grouped by color classes (${k} classes).`);
-      }
-    };
-
-    requestAnimationFrame(step);
-  };
-
-  // // ---- NEW: adjacency/targets helpers for recoloring ----
-  // const adj = useMemo(() => {
-  //   const m = new Map();
-  //   nodes.forEach(n => m.set(n.id, new Set()));
-  //   edges.forEach(({ a, b }) => {
-  //     if (!m.has(a)) m.set(a, new Set());
-  //     if (!m.has(b)) m.set(b, new Set());
-  //     m.get(a).add(b);
-  //     m.get(b).add(a);
-  //   });
-  //   return m;
-  // }, [nodes, edges]);
-
-  // const targetSizes = useMemo(() => {
-  //   if (!k) return [];
-  //   const n = nodes.length;
-  //   const base = Math.floor(n / k), extra = n % k;
-  //   return Array.from({ length: k }, (_, i) => base + (i < extra ? 1 : 0));
-  // }, [nodes.length, k]);
-
-  // const bucketsFrom = (col) => {
-  //   const b = Array.from({ length: k }, () => new Set());
-  //   for (const n of nodes) {
-  //     const c = col[n.id];
-  //     if (c != null && c >= 0 && c < k) b[c].add(n.id);
-  //   }
-  //   return b;
-  // };
-
-  // const canMove = (v, toClass, col) => {
-  //   for (const u of adj.get(v) || []) {
-  //     if (col[u] === toClass) return false;
-  //   }
-  //   return true;
-  // };
-
-  // const hasCapacity = (cls, buckets, targets) => {
-  //   if (cls < 0 || cls >= buckets.length) return false;
-  //   return buckets[cls].size < targets[cls];
-  // };
-
-  // // ---- NEW: Case 1 recoloring step ----
-  // // ---- REPLACE your runCase1Step with this version ----
-  // const runCase1Step = () => {
-  //   const r = parseInt(maxDegree, 10);
-  //   if (!enforceMaxDegree || isNaN(r) || r < 0) {
-  //     setInfo('Enable "Enforce Max Degree" and set a valid r first.');
-  //     return;
-  //   }
-  //   if (!k) { setInfo('Invalid number of color classes.'); return; }
-  //   if (edges.length === 0) { setInfo('No edges to resolve.'); return; }
-
-  //   // 1) Find a monochromatic (conflict) edge xy in class V
-  //   const col0 = { ...coloring };
-  //   let conflict = null;
-  //   for (const { a, b } of edges) {
-  //     if (col0[a] != null && col0[a] === col0[b]) { conflict = { x: a, y: b, V: col0[a] }; break; }
-  //   }
-  //   if (!conflict) {
-  //     setInfo('Already a proper coloring (no monochromatic edges).');
-  //     return;
-  //   }
-  //   const { x, y, V } = conflict;
-
-  //   // Helpers
-  //   const bucketsFrom = (col) => {
-  //     const b = Array.from({ length: k }, () => new Set());
-  //     for (const n of nodes) {
-  //       const c = col[n.id];
-  //       if (c != null && c >= 0 && c < k) b[c].add(n.id);
-  //     }
-  //     return b;
-  //   };
-  //   const canMove = (v, toClass, col) => {
-  //     for (const u of adj.get(v) || []) {
-  //       if (col[u] === toClass) return false;
-  //     }
-  //     return true;
-  //   };
-  //   const hasCapacity = (cls, buckets, targets) =>
-  //     cls >= 0 && cls < buckets.length && buckets[cls].size < targets[cls];
-
-  //   // 2) Primary move: move one endpoint (x or y) to some W != V
-  //   //    IMPORTANT: do NOT require capacity for this move; allow a temporary overfull class
-  //   let mover = null, W = null;
-  //   const tryEndpoint = (v) => {
-  //     for (let cls = 0; cls < k; cls++) if (cls !== V) {
-  //       if (canMove(v, cls, col0)) return cls;
-  //     }
-  //     return null;
-  //   };
-  //   W = tryEndpoint(x); mover = x;
-  //   if (W == null) { W = tryEndpoint(y); mover = y; }
-  //   if (W == null) {
-  //     setInfo('Case 1: neither endpoint can move to any other class without conflict.');
-  //     return;
-  //   }
-
-  //   // apply mover -> W (nearly equitable allowed)
-  //   const col1 = { ...col0 };
-  //   col1[mover] = W;
-
-  //   // 3) Now find z ∈ W and X ≠ W, such that:
-  //   //    - X has capacity,
-  //   //    - z can move to X,
-  //   //    - there exists y1 ∈ V ∩ N(z) that becomes movable to W once z leaves W.
-  //   const buckets1 = bucketsFrom(col1);   // after mover→W
-  //   for (const z of buckets1[W]) {
-  //     for (let X = 0; X < k; X++) if (X !== W) {
-  //       if (!hasCapacity(X, buckets1, targetSizes)) continue;   // require capacity for z→X
-  //       if (!canMove(z, X, col1)) continue;
-
-  //       // S_z = neighbors of z in class V (under col1)
-  //       const Sz = [...(adj.get(z) || [])].filter(u => col1[u] === V);
-  //       for (const y1 of Sz) {
-  //         // After z leaves W, does y1 have any neighbor remaining in W?
-  //         let ok = true;
-  //         for (const u of adj.get(y1) || []) {
-  //           if (u === z) continue; // z will leave W
-  //           if (col1[u] === W) { ok = false; break; }
-  //         }
-  //         if (!ok) continue;
-
-  //         // Perform the two recolor moves:
-  //         // (a) z: W -> X  (X had capacity)
-  //         const col2 = { ...col1 };
-  //         col2[z] = X;
-
-  //         // (b) y1: V -> W (now safe because z left W)
-  //         if (!canMove(y1, W, col2)) {
-  //           // Safety; should be fine given the check above
-  //           continue;
-  //         }
-  //         col2[y1] = W;
-
-  //         setColoring(col2);
-  //         setInfo(`Case 1: moved ${mover} to class ${W}; then ${z} ${W}→${X}; then ${y1} ${V}→${W}.`);
-  //         return;
-  //       }
-  //     }
-  //   }
-
-  //   setInfo('Case 1: no suitable (z, X, y₁) found after the endpoint move. Try a different graph or r.');
-  // };
-
-   // Render map for aux graph
-   const auxGraphLayout = useMemo(() => {
-    const layout = new Map();
-    const num = auxGraphNodes.length;
-    if (num === 0) return layout;
-    
-    const w = 400, h = 400, R = 150, cX = w / 2, cY = h / 2;
-    auxGraphNodes.forEach((node, i) => {
-      const angle = (i / num) * 2 * Math.PI - Math.PI / 2;
-      layout.set(node.id, {
-        x: cX + R * Math.cos(angle),
-        y: cY + R * Math.sin(angle)
-      });
-    });
-    return layout;
-  }, [auxGraphNodes]);
-  
-  const pathEdges = useMemo(() => {
-    const set = new Set();
-    for(let i=0; i < auxGraphPath.length - 1; i++) {
-      set.add(`${auxGraphPath[i]}-${auxGraphPath[i+1]}`);
-    }
-    return set;
-  }, [auxGraphPath]);
-
-
+  /* ════════════════════════ RENDER ════════════════════════ */
   return (
     <>
       <Navbar />
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50">
-        <div className="container mx-auto px-4 py-8">
-          {/* Header */}
-          <div className="text-center mb-8 animate-fade-in-up">
-            <div className="mb-4">
-              <h1 className="text-5xl font-bold bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-800 bg-clip-text text-transparent mb-2">
-                Graph Coloring Visualizer
-              </h1>
-              <p className="text-slate-600 text-xl font-medium animate-slide-in-right">Interactive Graph Theory Learning Tool</p>
-              <p className="text-slate-500 text-sm mt-2">Explore graph coloring algorithms with maximum degree constraints</p>
+      <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-stone-50">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 py-6 space-y-5">
+
+          {/* ── header ── */}
+          <header className="text-center space-y-1 animate-fade-in-up">
+            <h1 className="text-3xl sm:text-4xl font-extrabold gradient-text tracking-tight">
+              Hajnal–Szemerédi Equitable Coloring
+            </h1>
+            <p className="text-slate-500 text-sm sm:text-base max-w-2xl mx-auto">
+              Step-by-step visualization of the Kierstead–Kostochka polynomial-time algorithm.
+              Every graph with {"Δ(G) \u2264 r"} admits an equitable (r+1)-coloring.
+            </p>
+          </header>
+
+          {/* ── toast ── */}
+          {toast && (
+            <div className="bg-white border border-slate-200 rounded-xl px-4 py-2.5 shadow-sm flex items-center gap-2 animate-slide-in-right">
+              <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse-slow" />
+              <span className="text-sm text-slate-700">{toast}</span>
             </div>
-            <div className="mt-6 p-6 bg-white rounded-xl shadow-lg border border-slate-200 backdrop-blur-sm bg-white/80 animate-fade-in-up">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-6 text-sm">
-                <div className="text-center group">
-                  <div className="p-3 rounded-lg bg-gradient-to-br from-blue-50 to-blue-100 group-hover:from-blue-100 group-hover:to-blue-200 transition-all duration-200">
-                    <span className="block font-medium text-slate-700 mb-1">Nodes</span>
-                    <div className="text-3xl font-bold text-blue-600">{nodes.length}</div>
-                  </div>
-                </div>
-                <div className="text-center group">
-                  <div className="p-3 rounded-lg bg-gradient-to-br from-emerald-50 to-emerald-100 group-hover:from-emerald-100 group-hover:to-emerald-200 transition-all duration-200">
-                    <span className="block font-medium text-slate-700 mb-1">Edges</span>
-                    <div className="text-3xl font-bold text-emerald-600">{edges.length}</div>
-                  </div>
-                </div>
-                <div className="text-center group col-span-2 sm:col-span-1">
-                  <div className="p-3 rounded-lg bg-gradient-to-br from-purple-50 to-purple-100 group-hover:from-purple-100 group-hover:to-purple-200 transition-all duration-200">
-                    <span className="block font-medium text-slate-700 mb-1">Colors</span>
-                    <div className="text-3xl font-bold text-purple-600">{colorPalette.length}</div>
-                  </div>
-                </div>
+          )}
+
+          {/* ── stats ── */}
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 animate-fade-in-up">
+            {[
+              { label: 'Vertices n', value: nodes.length, color: 'from-blue-50 to-blue-100 text-blue-700' },
+              { label: 'Edges |E|', value: dispEdges.length, color: 'from-emerald-50 to-emerald-100 text-emerald-700' },
+              { label: '\u0394(G)', value: actualMaxDeg, color: actualMaxDeg > r ? 'from-red-50 to-red-100 text-red-600' : 'from-amber-50 to-amber-100 text-amber-700' },
+              { label: `r = ${r}, k = ${k}`, value: `${k} colors`, color: 'from-purple-50 to-purple-100 text-purple-700' },
+              { label: 'Status', value: conflictCount > 0 ? `${conflictCount} conflict${conflictCount > 1 ? 's' : ''}` : isEquitable && curStep === null ? 'Equitable' : curStep ? `Step ${hsIdx + 1}/${hsSteps.length}` : 'Proper', color: conflictCount > 0 ? 'from-red-50 to-red-100 text-red-600' : 'from-green-50 to-green-100 text-green-700' },
+            ].map((s, i) => (
+              <div key={i} className={`rounded-xl bg-gradient-to-br ${s.color} p-3 text-center border border-white/60`}>
+                <div className="text-[10px] font-semibold uppercase tracking-wider opacity-70">{s.label}</div>
+                <div className="text-lg font-bold mt-0.5">{s.value}</div>
               </div>
-              {nodeIds.length > 0 && (
-                <div className="mt-4 p-3 bg-slate-50 rounded-lg">
-                  <span className="block text-sm font-medium text-slate-700 mb-1">Node IDs:</span>
-                  <div className="text-sm text-slate-600 font-mono">
-                    {nodeIds.join(', ')}
-                  </div>
-                </div>
-              )}
-            </div>
+            ))}
           </div>
 
-          {/* Info banner */}
-          {info && (
-            <div className="mb-6 bg-gradient-to-r from-blue-50 to-emerald-50 border border-blue-200 rounded-xl p-4 shadow-sm animate-slide-in-right">
-              <div className="flex items-center">
-                <div className="w-3 h-3 bg-gradient-to-r from-blue-500 to-emerald-500 rounded-full mr-3 animate-pulse-slow shadow-sm"></div>
-                <span className="text-blue-800 font-medium text-sm">{info}</span>
+          {/* ── algorithm controls ── */}
+          <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                <svg className="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                Algorithm (Kierstead–Kostochka, Theorem 3.2)
+              </h2>
+              <div className="text-xs text-slate-400">
+                {hsSteps.length > 0 && `${hsSteps.length} steps computed`}
               </div>
             </div>
-          )}
-          {lemmaStatus && (
-            <div className="mb-4 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl p-4 shadow-sm">
-              <div className="flex items-center">
-                <div className="w-3 h-3 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full mr-3 animate-pulse-slow shadow-sm"></div>
-                <span className="text-purple-800 font-medium text-sm">{lemmaStatus}</span>
-              </div>
-            </div>
-          )}
 
-          {/* Maximum Degree Constraint */}
-          <div className="bg-gradient-to-r from-yellow-50 to-amber-50 rounded-xl shadow-lg p-6 mb-8 border border-yellow-200">
-            <div className="flex flex-wrap items-center gap-4">
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
-                </svg>
-                <h3 className="text-lg font-semibold text-slate-800">Graph Coloring Algorithm</h3>
+            {/* presets */}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Load&nbsp;preset:</span>
+              {[
+                ['paper', 'Paper Graph (16v, 22e, \u0394=3)'],
+                ['petersen', 'Petersen (10v, \u0394=3)'],
+                ['cycle8', 'Cycle C\u2088 (8v, \u0394=2)'],
+                ['k33', 'K\u2083,\u2083 (6v, \u0394=3)'],
+              ].map(([id, label]) => (
+                <button key={id} onClick={() => loadPreset(id)}
+                  className="text-xs bg-slate-100 hover:bg-indigo-100 text-slate-700 hover:text-indigo-700 font-medium px-3 py-1.5 rounded-lg transition-colors">
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* playback */}
+            <div className="flex flex-wrap items-center gap-2">
+              <button onClick={onCompute}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg shadow-sm transition-colors">
+                Compute Steps
+              </button>
+              <div className="h-6 w-px bg-slate-200" />
+              {!hsPlaying ? (
+                <button onClick={hsRun} disabled={hsSteps.length === 0 || hsIdx + 1 >= hsSteps.length}
+                  className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-sm font-semibold px-3 py-2 rounded-lg shadow-sm transition-colors disabled:cursor-not-allowed">
+                  &#9654; Play
+                </button>
+              ) : (
+                <button onClick={hsPause}
+                  className="bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold px-3 py-2 rounded-lg shadow-sm transition-colors">
+                  &#9646;&#9646; Pause
+                </button>
+              )}
+              <button onClick={hsBack} disabled={hsIdx <= -1 || hsPlaying}
+                className="bg-slate-200 hover:bg-slate-300 disabled:bg-slate-100 text-slate-700 disabled:text-slate-400 text-sm font-medium px-2.5 py-2 rounded-lg transition-colors disabled:cursor-not-allowed">
+                &#9664;
+              </button>
+              <button onClick={hsForward} disabled={hsIdx + 1 >= hsSteps.length || hsPlaying}
+                className="bg-slate-200 hover:bg-slate-300 disabled:bg-slate-100 text-slate-700 disabled:text-slate-400 text-sm font-medium px-2.5 py-2 rounded-lg transition-colors disabled:cursor-not-allowed">
+                &#9654;
+              </button>
+              <button onClick={hsJumpToEnd} disabled={hsSteps.length === 0 || hsPlaying}
+                className="bg-slate-200 hover:bg-slate-300 disabled:bg-slate-100 text-slate-700 disabled:text-slate-400 text-sm font-medium px-2.5 py-2 rounded-lg transition-colors disabled:cursor-not-allowed">
+                &#9654;&#9654;
+              </button>
+              <button onClick={hsReset} disabled={hsSteps.length === 0}
+                className="bg-slate-200 hover:bg-slate-300 disabled:bg-slate-100 text-slate-700 disabled:text-slate-400 text-sm font-medium px-2.5 py-2 rounded-lg transition-colors disabled:cursor-not-allowed">
+                &#8635; Reset
+              </button>
+              <div className="flex items-center gap-1.5 ml-auto">
+                <label className="text-xs text-slate-500">Speed</label>
+                <input type="range" min="200" max="3000" step="100" value={hsSpeed} onChange={(e) => setHsSpeed(Number(e.target.value))} className="w-24 accent-indigo-500" />
+                <span className="text-xs text-slate-500 w-12 text-right">{hsSpeed}ms</span>
               </div>
-              <div className="flex items-center gap-3">
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={enforceMaxDegree}
-                    onChange={(e) => setEnforceMaxDegree(e.target.checked)}
-                    className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                  />
-                  <span className="text-sm font-medium text-slate-700">Enforce Max Degree</span>
-                </label>
-                <input
-                  type="number"
-                  placeholder="Max degree (r)"
-                  value={maxDegree}
-                  onChange={(e) => setMaxDegree(e.target.value)}
-                  min="0"
-                  className="px-3 py-1 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                />
-                {enforceMaxDegree && colorPalette.length > 0 && (
-                  <span className="text-sm text-slate-700">Using <b>{parseInt(maxDegree, 10) + 1}</b> colors</span>
+            </div>
+
+            {/* progress */}
+            {hsSteps.length > 0 && (
+              <div>
+                <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-300 ease-out"
+                    style={{ width: `${Math.max(0, ((hsIdx + 1) / hsSteps.length) * 100)}%` }} />
+                </div>
+              </div>
+            )}
+
+            {/* step message */}
+            {curStep && (
+              <div className="flex items-start gap-2 bg-slate-50 rounded-xl px-4 py-3 border border-slate-100">
+                {stepBadge(curStep.type)}
+                <span className="text-sm text-slate-700 leading-relaxed">{curStep.message}</span>
+              </div>
+            )}
+          </section>
+
+          {/* ── main content: graph + sidebar ── */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+            {/* ─ main graph ─ */}
+            <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-slate-700">Graph G</h3>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => { setConnectMode((m) => !m); setConnectSrc(null); }}
+                    className={`text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors ${connectMode ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                    {connectMode ? 'Connect ON' : 'Connect Mode'}
+                  </button>
+                  <span className="text-[10px] text-slate-400">Zoom {zoom.toFixed(1)}x</span>
+                </div>
+              </div>
+
+              <div className="relative overflow-hidden rounded-xl border border-slate-100 bg-gradient-to-br from-slate-50/80 to-stone-50/80">
+                <svg ref={svgRef} width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet"
+                  className="block"
+                  style={{ transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`, transformOrigin: 'center', transition: dragId || isPanning ? 'none' : 'transform 0.15s ease-out', cursor: connectMode ? 'crosshair' : isPanning ? 'grabbing' : 'grab' }}
+                  onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp}
+                  onMouseDown={onSvgMouseDown} onDoubleClick={onSvgDblClick} onWheel={onWheel}>
+
+                  {/* edges */}
+                  {dispEdges.map(({ a, b }) => {
+                    const na = nodes.find((n) => n.id === a);
+                    const nb = nodes.find((n) => n.id === b);
+                    if (!na || !nb) return null;
+                    const isCur = hl.currentEdge && ((hl.currentEdge.a === a && hl.currentEdge.b === b) || (hl.currentEdge.a === b && hl.currentEdge.b === a));
+                    const isConf = hl.conflictEdge && ((hl.conflictEdge.a === a && hl.conflictEdge.b === b) || (hl.conflictEdge.a === b && hl.conflictEdge.b === a));
+                    const isMono = dispColoring[a] != null && dispColoring[a] === dispColoring[b];
+                    let stroke = '#cbd5e1'; let sw = 1.5;
+                    if (isConf) { stroke = '#ef4444'; sw = 4; }
+                    else if (isCur) { stroke = '#22c55e'; sw = 3.5; }
+                    else if (isMono && !curStep) { stroke = '#fca5a5'; sw = 2; }
+                    return <line key={`${a}-${b}`} x1={na.x} y1={na.y} x2={nb.x} y2={nb.y} stroke={stroke} strokeWidth={sw} style={{ transition: 'stroke 0.3s, stroke-width 0.3s' }} />;
+                  })}
+
+                  {/* connect-mode pending line */}
+                  {connectMode && connectSrc !== null && (() => {
+                    const src = nodes.find((n) => n.id === connectSrc);
+                    if (!src) return null;
+                    return <circle cx={src.x} cy={src.y} r={28} fill="none" stroke="#22c55e" strokeWidth={2} strokeDasharray="4 3" className="animate-pulse-slow" />;
+                  })()}
+
+                  {/* nodes */}
+                  {nodes.map((n) => {
+                    const isMoved = hl.movedVertex === n.id;
+                    const isProc = hl.processingVertex === n.id;
+                    const isSrc = connectSrc === n.id;
+                    let ring = '#94a3b8', rw = 1.5;
+                    if (isMoved) { ring = '#22c55e'; rw = 4; }
+                    else if (isProc) { ring = '#6366f1'; rw = 3; }
+                    else if (isSrc) { ring = '#22c55e'; rw = 3; }
+                    return (
+                      <g key={n.id} onMouseDown={(e) => onMouseDownNode(e, n)}
+                        style={{ cursor: connectMode ? 'pointer' : dragId === n.id ? 'grabbing' : 'grab' }}>
+                        {isMoved && <circle cx={n.x} cy={n.y} r={30} fill="none" stroke="#22c55e" strokeWidth={2} opacity={0.4} className="animate-pulse-slow" />}
+                        <circle cx={n.x} cy={n.y} r={22} fill={getFill(n.id)} stroke={ring} strokeWidth={rw}
+                          style={{ transition: 'fill 0.4s ease, stroke 0.3s, stroke-width 0.3s' }} />
+                        <text x={n.x} y={n.y} textAnchor="middle" dy=".35em" fontSize={12} fontWeight="700"
+                          fill="#fff" style={{ pointerEvents: 'none', userSelect: 'none' }}>
+                          {n.id}
+                        </text>
+                      </g>
+                    );
+                  })}
+                </svg>
+
+                {/* tip overlay */}
+                <div className="absolute bottom-2 left-2 right-2 flex justify-between text-[10px] text-slate-400 pointer-events-none">
+                  <span>Double-click to add vertex</span>
+                  <span>Scroll to zoom &middot; Drag to pan</span>
+                </div>
+              </div>
+            </div>
+
+            {/* ─ sidebar ─ */}
+            <div className="space-y-4">
+
+              {/* color legend */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+                <h3 className="text-sm font-bold text-slate-700 mb-3">Color Classes (mod-{k})</h3>
+                <div className="space-y-1.5">
+                  {pal.map((c, i) => {
+                    const cnt = curStep
+                      ? Object.values(curStep.coloring).filter((v) => v === i).length
+                      : classSizes[i];
+                    return (
+                      <div key={i} className="flex items-center gap-2">
+                        <span className="w-4 h-4 rounded-full border border-black/10 shrink-0" style={{ background: c }} />
+                        <span className="text-xs text-slate-600">
+                          <b>Class {i}</b>{CLASS_NAMES[i] ? ` (${CLASS_NAMES[i]})` : ''}: <b>{cnt}</b> vertices
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="mt-3 pt-2 border-t border-slate-100 text-[11px] text-slate-500">
+                  Equitable target: each class has {nodes.length > 0 ? <b>{Math.floor(nodes.length / k)}</b> : '?'}
+                  {nodes.length % k > 0 && <> or <b>{Math.floor(nodes.length / k) + 1}</b></>} vertices.
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  <button onClick={applyModColoring} className="text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 py-1 rounded transition-colors">
+                    Reset to mod-{k}
+                  </button>
+                  <button onClick={applyGreedyColoring} className="text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 py-1 rounded transition-colors">
+                    Greedy proper
+                  </button>
+                </div>
+              </div>
+
+              {/* auxiliary digraph H(G,f) */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+                <h3 className="text-sm font-bold text-slate-700 mb-1">Auxiliary Digraph H(G,&thinsp;f)</h3>
+                <p className="text-[10px] text-slate-400 mb-2">
+                  Arc V&rarr;W means some vertex in V has no neighbor in W (movable).
+                </p>
+                <svg viewBox="0 0 280 280" className="w-full h-auto">
+                  <defs>
+                    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+                      <path d="M0 0L10 5L0 10z" fill="#94a3b8" />
+                    </marker>
+                    <marker id="ahp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+                      <path d="M0 0L10 5L0 10z" fill="#7c3aed" />
+                    </marker>
+                  </defs>
+
+                  {auxG.nodes.length === 0 && (
+                    <text x="140" y="140" textAnchor="middle" fontSize="12" fill="#94a3b8">
+                      Run algorithm to see H(G,f)
+                    </text>
+                  )}
+
+                  {/* aux edges */}
+                  {auxG.edges.map((e) => {
+                    const p1 = auxLayout.get(e.from);
+                    const p2 = auxLayout.get(e.to);
+                    if (!p1 || !p2) return null;
+                    const isP = auxPathSet.has(`${e.from}-${e.to}`);
+                    const dx = p2.x - p1.x, dy = p2.y - p1.y;
+                    const d = Math.hypot(dx, dy) || 1;
+                    const off = 24;
+                    /* offset perpendicular for bidirectional edges */
+                    const hasReverse = auxG.edges.some((r) => r.from === e.to && r.to === e.from);
+                    const perp = hasReverse ? 6 : 0;
+                    const nx = -dy / d * perp, ny = dx / d * perp;
+                    return (
+                      <line key={`${e.from}-${e.to}`}
+                        x1={p1.x + (dx / d) * off + nx} y1={p1.y + (dy / d) * off + ny}
+                        x2={p2.x - (dx / d) * off + nx} y2={p2.y - (dy / d) * off + ny}
+                        stroke={isP ? '#7c3aed' : '#cbd5e1'} strokeWidth={isP ? 2.5 : 1}
+                        markerEnd={isP ? 'url(#ahp)' : 'url(#ah)'}
+                        style={{ transition: 'stroke 0.3s' }} />
+                    );
+                  })}
+
+                  {/* aux nodes */}
+                  {auxG.nodes.map((n) => {
+                    const p = auxLayout.get(n.id);
+                    if (!p) return null;
+                    const isP = auxG.path.includes(n.id);
+                    const fill = pal[n.id] || '#d1d5db';
+                    let stroke = '#64748b', sw = 1;
+                    if (isP) { stroke = '#7c3aed'; sw = 3; }
+                    else if (n.type === 'large') { stroke = '#2563eb'; sw = 2.5; }
+                    else if (n.type === 'small') { stroke = '#d97706'; sw = 2.5; }
+                    return (
+                      <g key={n.id}>
+                        <circle cx={p.x} cy={p.y} r={22} fill={fill} stroke={stroke} strokeWidth={sw}
+                          style={{ transition: 'fill 0.4s, stroke 0.3s' }} />
+                        <text x={p.x} y={p.y - 2} textAnchor="middle" dy=".3em" fontSize={11} fontWeight="700" fill="#fff"
+                          style={{ pointerEvents: 'none' }}>
+                          V{n.id}
+                        </text>
+                        <text x={p.x} y={p.y + 14} textAnchor="middle" fontSize={9} fill="#fff" opacity={0.8}
+                          style={{ pointerEvents: 'none' }}>
+                          n={n.size}
+                        </text>
+                      </g>
+                    );
+                  })}
+                </svg>
+                {auxG.nodes.length > 0 && (
+                  <div className="mt-1 flex flex-wrap gap-1 text-[10px] text-slate-400">
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500 inline-block" /> V+ (large)</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500 inline-block" /> V- (small)</span>
+                    {auxG.path.length > 0 && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-violet-600 inline-block" /> path</span>}
+                  </div>
                 )}
               </div>
 
-              {/* Legend with actual sizes vs targets */}
-              {enforceMaxDegree && k > 0 && (
-                <div className="w-full mt-3 flex flex-wrap gap-x-4 gap-y-2">
-                    {colorPalette.map((c, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                        <span className="inline-block w-3 h-3 rounded-full border border-black/10" style={{ background: c }} />
-                        <span className="text-xs text-slate-700">Class {i}: <b>{currentColorCounts[i] ?? 0}</b></span>
-                    </div>
-                    ))}
-                    {q_base > 0 && (
-                      <div className="w-full text-xs text-slate-600 pt-2 border-t border-yellow-300 mt-2">
-                        Equitable Target: {r_rem} classes of size {q_base + 1}, {k - r_rem} classes of size {q_base}
-                      </div>
-                    )}
-                </div>
-              )}
-
-              <div className="w-full mt-3 flex flex-wrap gap-2">
-                <button
-                  onClick={sortNodesAnimated}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
-                >
-                  Sort by ID (animate)
-                </button>
-                <button
-                  onClick={groupByColorClasses}
-                  disabled={!enforceMaxDegree || k === 0}
-                  className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded-lg transition-colors"
-                  title={!enforceMaxDegree || k === 0 ? "Enable 'Enforce Max Degree' and set max degree to use this feature" : "Group nodes by their color classes"}
-                >
-                  Group by Color Classes
-                </button>
+              {/* max degree control */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+                <h3 className="text-sm font-bold text-slate-700 mb-2">Parameters</h3>
+                <label className="flex items-center gap-2 text-xs text-slate-600">
+                  Max degree r =
+                  <input type="number" min={1} max={20} value={maxDeg}
+                    onChange={(e) => setMaxDeg(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                    className="w-14 px-2 py-1 border border-slate-200 rounded-lg text-center text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400" />
+                  <span className="text-slate-400">&rarr; k = {k} colors</span>
+                </label>
               </div>
             </div>
           </div>
 
-          {/* Control Panel */}
-          <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-xl p-8 mb-8 border border-slate-200">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Node Operations */}
-              <div className="space-y-6">
-                <div className="flex items-center gap-2 pb-3 border-b-2 border-blue-200">
-                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                  </svg>
-                  <h3 className="text-lg font-bold text-slate-800">Node Operations</h3>
-                </div>
+          {/* ── graph builder ── */}
+          <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <button onClick={() => setBuilderOpen((o) => !o)}
+              className="w-full flex items-center justify-between px-5 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors">
+              <span className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
+                Graph Builder
+              </span>
+              <svg className={`w-4 h-4 text-slate-400 transition-transform ${builderOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+            </button>
 
-                <button
-                  onClick={addNode}
-                  className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
-                >
-                  Add Single Node
-                </button>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">Add Multiple Nodes</label>
-                  <input
-                    type="number"
-                    placeholder="Number of nodes (1-50)"
-                    value={bulkNodeCount}
-                    onChange={(e) => setBulkNodeCount(e.target.value)}
-                    min="1"
-                    max="50"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') addBulkNodes();
-                    }}
-                  />
-                  <button
-                    onClick={addBulkNodes}
-                    className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
-                  >
-                    Add Bulk Nodes
-                  </button>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">Delete Node</label>
-                  <input
-                    type="number"
-                    placeholder="Node ID to Delete"
-                    value={deleteNodeId}
-                    onChange={(e) => setDeleteNodeId(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') deleteNode();
-                    }}
-                  />
-                  <button
-                    onClick={deleteNode}
-                    className="w-full bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-lg transition-colors"
-                  >
-                    Delete Node
-                  </button>
-                </div>
-              </div>
-
-              {/* Tools */}
-              <div className="space-y-6">
-                <div className="flex items-center gap-2 pb-3 border-b-2 border-emerald-200">
-                  <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  <h3 className="text-lg font-bold text-slate-800">Tools</h3>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={undo}
-                    disabled={currentStep === 0}
-                    className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded-lg transition-colors"
-                  >
-                    Undo
-                  </button>
-                  <button
-                    onClick={redo}
-                    disabled={currentStep >= history.length}
-                    className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded-lg transition-colors"
-                  >
-                    Redo
-                  </button>
-                </div>
-
-                <button
-                  onClick={createExampleGraph}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors font-semibold"
-                >
-                  Example Graph for Lemma 2.1
-                </button>
-
-                <button
-                  onClick={clearGraph}
-                  className="w-full bg-slate-600 hover:bg-slate-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
-                >
-                  Clear Graph
-                </button>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">Display</label>
-                  <div className="text-xs text-slate-600">
-                    Scroll to zoom. Drag background to pan. Drag nodes to move.
-                  </div>
-                </div>
-              </div>
-
-              {/* Edge Operations */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 pb-3 border-b-2 border-amber-200">
-                  <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7h16M4 12h10M4 17h7" />
-                  </svg>
-                  <h3 className="text-lg font-bold text-slate-800">Edge Operations</h3>
-                </div>
-
-                <div className="w-full">
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Bulk predefined edges (e.g. <code>1-2, 2-3, 5-1</code> or line-separated)
-                  </label>
-                  <textarea
-                    value={bulkEdgesText}
-                    onChange={(e) => setBulkEdgesText(e.target.value)}
-                    rows={3}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
-                    placeholder="1-2, 2-3, 5-1"
-                  />
-                  <div className="mt-2 flex items-center gap-2">
-                    <button
-                      onClick={applyBulkEdgesFromText}
-                      className="bg-amber-600 hover:bg-amber-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
-                    >
-                      Apply Bulk Edges
+            {builderOpen && (
+              <div className="px-5 pb-5 grid grid-cols-1 md:grid-cols-3 gap-5 border-t border-slate-100 pt-4">
+                {/* nodes */}
+                <div className="space-y-3">
+                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Vertices</h4>
+                  <div className="flex gap-2">
+                    <input type="number" placeholder="Count" value={nodeCount} onChange={(e) => setNodeCount(e.target.value)} min={1} max={100}
+                      onKeyDown={(e) => { if (e.key === 'Enter') addBulkNodes(); }}
+                      className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-300" />
+                    <button onClick={addBulkNodes}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors shadow-sm">
+                      Add
                     </button>
-                    <span className="text-xs text-slate-600">
-                      Requires r. Every node must have ≥1 edge and ≤ r.
-                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-400">Or double-click the canvas to place a vertex.</p>
+                  <button onClick={clearAll}
+                    className="w-full text-xs bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 py-2 rounded-lg transition-colors">
+                    Clear Everything
+                  </button>
+                </div>
+
+                {/* edges */}
+                <div className="space-y-3">
+                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Edges</h4>
+                  <div className="space-y-1">
+                    <textarea value={bulkText} onChange={(e) => setBulkText(e.target.value)} rows={3} placeholder="0-1, 1-2, 2-3, ..."
+                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-300 font-mono" />
+                    <button onClick={applyBulkEdges}
+                      className="w-full bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium py-2 rounded-lg transition-colors shadow-sm">
+                      Apply Edges
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-slate-400">
+                    Or enable <b>Connect Mode</b> above, then click two vertices to connect.
+                    Max degree r&nbsp;=&nbsp;{r} is enforced.
+                  </p>
+                </div>
+
+                {/* info */}
+                <div className="space-y-3">
+                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Quick Reference</h4>
+                  <div className="text-xs text-slate-500 space-y-1.5 leading-relaxed">
+                    <p><b>Hajnal–Szemerédi Theorem:</b> Every graph with &Delta;(G)&nbsp;&le;&nbsp;r has an equitable (r+1)-coloring.</p>
+                    <p><b>Equitable:</b> class sizes differ by at most 1.</p>
+                    <p><b>Mod coloring:</b> vertex v &rarr; class (v&nbsp;mod&nbsp;k). For k=4: {'{'}0,4,8,12{'}'} are Red, {'{'}1,5,9,13{'}'} Blue, etc.</p>
+                    <p><b>Lemma 2.1:</b> If V+ is accessible to V- in H(G,f), move a vertex along each arc of the path.</p>
                   </div>
                 </div>
-
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={buildConflictProneEdges}
-                    className="bg-amber-600 hover:bg-amber-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
-                    title="Favor same-color adjacency, respect r, avoid complete graphs"
-                  >
-                    Conflict-Prone Edges
-                  </button>
-
-                  <button
-                    onClick={simulateEdges}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
-                    title="Balanced pattern: i → (i+1..i+r), undirected (no wrap)"
-                  >
-                    Simulate Edges (balanced)
-                  </button>
-
-                  <button
-                    onClick={clearEdges}
-                    className="bg-slate-600 hover:bg-slate-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
-                  >
-                    Clear Edges
-                  </button>
-
-                  {/* NEW: Case 1 recoloring trigger */}
-                  <button
-                    onClick={runLemma2_1}
-                    disabled={!enforceMaxDegree || k < 2}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
-                    title=""
-                  >
-                    Apply Lemma 2.1
-                  </button>
-                </div>
               </div>
-            </div>
-          </div>
+            )}
+          </section>
 
-          {/* Graph Visualization */}
-          <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-xl p-8 border border-slate-200">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
-              <h3 className="text-lg font-bold text-slate-800">Graph Visualization</h3>
-              <div className="text-sm text-slate-500">
-                Zoom: ×{zoom.toFixed(1)} | Mouse wheel to zoom
-              </div>
-            </div>
-
-            <div className="flex justify-center overflow-x-auto">
-              <svg
-                ref={svgRef}
-                width={width}
-                height={height}
-                className="border-2 border-slate-300 rounded-lg bg-gradient-to-br from-slate-50 to-slate-100 min-w-full"
-                viewBox={`0 0 ${width} ${height}`}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
-                onMouseDown={handlePanStart}
-                onWheel={handleWheel}
-                style={{
-                  transform: `scale(${zoom}) translate(${pan.x}px, ${pan.y}px)`,
-                  transformOrigin: 'center',
-                  transition: draggedNode || isPanning ? 'none' : 'transform 0.1s ease-out',
-                  cursor: isPanning ? 'grabbing' : 'grab'
-                }}
-              >
-                {showSortGuide && (() => {
-                  const ordered = [...nodes].sort((a, b) => a.id - b.id);
-                  const marginX = 60;
-                  const y = height / 2;
-                  const n = ordered.length;
-                  const spacing = n > 1 ? (width - 2 * marginX) / (n - 1) : 0;
-                  return (
-                    <g opacity={0.5}>
-                      <line x1={marginX} y1={y} x2={width - marginX} y2={y} stroke="#a78bfa" strokeWidth={3} strokeDasharray="6 6" />
-                      {ordered.map((nd, idx) => {
-                        const x = marginX + idx * spacing;
-                        return (
-                          <g key={`tick-${nd.id}`} transform={`translate(${x},${y})`}>
-                            <circle r={6} fill="#a78bfa" />
-                            <text y={-12} textAnchor="middle" fontSize={11} fill="#6b21a8" fontWeight="600">{nd.id}</text>
-                          </g>
-                        );
-                      })}
-                    </g>
-                  );
-                })()}
-
-                {/* Edges */}
-                {edges.map(({ a, b }) => {
-                  const na = nodes.find(n => n.id === a);
-                  const nb = nodes.find(n => n.id === b);
-                  if (!na || !nb) return null;
-                  return (
-                    <line
-                      key={`${a}-${b}`}
-                      x1={na.x}
-                      y1={na.y}
-                      x2={nb.x}
-                      y2={nb.y}
-                      stroke="#94a3b8"
-                      strokeWidth={2}
-                      opacity={0.9}
-                    />
-                  );
-                })}
-
-                {/* Nodes */}
-                {nodes.map(n => (
-                  <g
-                    key={n.id}
-                    onMouseDown={(e) => handleMouseDown(e, n)}
-                    style={{ cursor: draggedNode === n.id ? 'grabbing' : 'grab' }}
-                    className={draggedNode === n.id ? '' : 'transition-all duration-300'}
-                  >
-                    <circle
-                      cx={n.x}
-                      cy={n.y}
-                      r={25}
-                      fill={getNodeFill(n.id)}
-                      stroke="#6B7280"
-                      strokeWidth={2}
-                      className={draggedNode === n.id ? 'hover:stroke-slate-400' : 'transition-all duration-300 hover:stroke-slate-400'}
-                    />
-                    <text
-                      x={n.x}
-                      y={n.y}
-                      textAnchor="middle"
-                      dy=".3em"
-                      fontSize={14}
-                      fontWeight="bold"
-                      fill="#FFFFFF"
-                      className={draggedNode === n.id ? 'select-none' : 'transition-all duration-300 select-none'}
-                    >
-                      {n.id}
-                    </text>
-                  </g>
-                ))}
-              </svg>
-            </div>
-          </div>
-
-          {/* Aux Graph Visualizer */}
-          {/* <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-4">
-            <h3 className="text-lg font-semibold text-slate-800 mb-2">Auxiliary Graph H on Lemma 2.1</h3>
-            <svg
-              viewBox={`0 0 400 400`}
-              className="w-full h-auto border border-slate-300 rounded-lg bg-slate-50"
-            >
-              <defs>
-                <marker
-                  id="arrowhead"
-                  viewBox="0 0 10 10"
-                  refX="9"
-                  refY="5"
-                  markerWidth="6"
-                  markerHeight="6"
-                  orient="auto-start-reverse"
-                >
-                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b" />
-                </marker>
-                <marker
-                  id="arrowhead-path"
-                  viewBox="0 0 10 10"
-                  refX="9"
-                  refY="5"
-                  markerWidth="6"
-                  markerHeight="6"
-                  orient="auto-start-reverse"
-                >
-                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#E11D48" />
-                </marker>
-              </defs>
-              // Edges 
-              <g>
-                {auxGraphEdges.map(edge => {
-                  const p1 = auxGraphLayout.get(edge.from);
-                  const p2 = auxGraphLayout.get(edge.to);
-                  if (!p1 || !p2) return null;
-                  const isPath = pathEdges.has(`${edge.from}-${edge.to}`);
-                  const stroke = isPath ? '#E11D48' : '#64748b';
-                  const marker = isPath ? 'url(#arrowhead-path)' : 'url(#arrowhead)';
-                  
-                  // Offset for arrowhead
-                  const dx = p2.x - p1.x;
-                  const dy = p2.y - p1.y;
-                  const dist = Math.hypot(dx, dy);
-                  const normX = dx / dist;
-                  const normY = dy / dist;
-                  const x2 = p2.x - normX * 30; // 30 is node radius
-                  const y2 = p2.y - normY * 30;
-                  
-                  return (
-                    <line
-                      key={`${edge.from}-${edge.to}`}
-                      x1={p1.x} y1={p1.y}
-                      x2={x2} y2={y2}
-                      stroke={stroke}
-                      strokeWidth={isPath ? 3 : 1.5}
-                      markerEnd={marker}
-                    />
-                  );
-                })}
-              </g>
-              // Nodes 
-              <g>
-                {auxGraphNodes.map(node => {
-                  const p = auxGraphLayout.get(node.id);
-                  if (!p) return null;
-                  const isPath = auxGraphPath.includes(node.id);
-                  const fill = colorPalette[node.id] || '#E5E7EB';
-                  
-                  let stroke = '#1e293b';
-                  let strokeWidth = 1;
-                  if (isPath) { stroke = '#E11D48'; strokeWidth = 4; }
-                  else if (node.type === 'large') { stroke = '#2563EB'; strokeWidth = 3; }
-                  else if (node.type === 'small') { stroke = '#D97706'; strokeWidth = 3; }
-                  
-                  return (
-                    <g key={node.id} transform={`translate(${p.x}, ${p.y})`}>
-                      <circle
-                        r="25"
-                        fill={fill}
-                        stroke={stroke}
-                        strokeWidth={strokeWidth}
-                      />
-                      <text
-                        textAnchor="middle"
-                        dy=".3em"
-                        className="fill-slate-900 font-bold select-none"
-                        style={{ pointerEvents: 'none' }}
-                      >
-                        {node.id}
-                      </text>
-                      <text
-                        textAnchor="middle"
-                        dy="35"
-                        className="fill-slate-600 text-sm select-node"
-                        style={{ pointerEvents: 'none' }}
-                      >
-                        (n={node.size})
-                      </text>
-                    </g>
-                  )
-                })}
-              </g>
-              {auxGraphNodes.length === 0 && (
-                <text x="200" y="200" textAnchor="middle" className="fill-slate-500">
-                  Run Lemma 2.1 to build Aux
-                </text>
-              )}
-            </svg>
-        </div> */}
-
-          {/* Quick Guide */}
-          <div className="mt-8 bg-gradient-to-r from-slate-50 to-emerald-50 rounded-xl p-4 border border-slate-200 shadow-sm">
-            <div className="flex items-center justify-between text-sm text-slate-600">
-              <span>🖱️ <strong>Drag</strong> nodes • <strong>Scroll</strong> to zoom • <strong>Drag background</strong> to pan</span>
-              <span>🎨 <strong>Add nodes</strong> → <strong>Set max degree</strong> → <strong>Case 1</strong> to repair conflicts</span>
-            </div>
-          </div>
         </div>
-      </div>
+      </main>
     </>
   );
 }
