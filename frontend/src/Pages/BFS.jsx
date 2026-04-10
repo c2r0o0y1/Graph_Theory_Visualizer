@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
-import Navbar from '../Components/NavBar';
 
 // Custom CSS for professional scrollbars
 const scrollbarStyles = `
@@ -1193,8 +1192,7 @@ export default function BFS() {
 
   return (
     <>
-    <Navbar />
-      
+
       {/* Scroll Progress Bar */}
       <div className="fixed top-0 left-0 w-full h-1 bg-slate-200 z-50">
         <div 

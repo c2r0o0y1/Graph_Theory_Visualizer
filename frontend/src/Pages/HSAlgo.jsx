@@ -1,5 +1,4 @@
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
-import Navbar from '../Components/NavBar';
 
 /* ─────────────────── colour palette ─────────────────── */
 const PALETTE = [
@@ -713,7 +712,6 @@ export default function HSAlgo() {
   /* ════════════════════════ RENDER ════════════════════════ */
   return (
     <>
-      <Navbar />
       <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-stone-50">
         <div className="max-w-[1440px] mx-auto px-4 sm:px-6 py-6 space-y-5">
 
