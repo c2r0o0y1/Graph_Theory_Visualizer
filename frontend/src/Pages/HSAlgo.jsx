@@ -427,12 +427,6 @@ export default function HSAlgo() {
     flash(`Added ${count} vertices (${startId}\u2013${startId + count - 1}).`);
   };
 
-  const deleteNode = (id) => {
-    setNodes((prev) => prev.filter((n) => n.id !== id));
-    setEdges((prev) => prev.filter((e) => e.a !== id && e.b !== id));
-    setColoring((prev) => { const c = { ...prev }; delete c[id]; return c; });
-  };
-
   const tryAddEdge = useCallback((a, b) => {
     if (a === b) return false;
     const ea = Math.min(a, b), eb = Math.max(a, b);

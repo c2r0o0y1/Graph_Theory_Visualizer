@@ -1,15 +1,33 @@
 # Graph Theory Visualizer
 
-An interactive React app for exploring graph-theory algorithms. The flagship
-feature is a step-by-step visualizer of the **Hajnal–Szemerédi theorem** via
-the short proof by **Kierstead & Kostochka** (*A Short Proof of the
-Hajnal–Szemerédi Theorem on Equitable Colouring*, 2008). The app runs the
-full polynomial-time algorithm from Theorem 3.2 on the 16-vertex paper graph
-and animates every move.
+An interactive React app for exploring graph-theory algorithms as live
+processes, not static notation.
+
+Most graph theory courses give you notation: definitions, theorem statements,
+adjacency matrices. What they do not show is what an algorithm is doing while
+it runs. This project is built around that gap. You can watch BFS grow by
+layers, DFS commit down branches and backtrack, bipartite checking fail at the
+exact conflict edge, and matching/coloring algorithms reveal their internal
+state one step at a time.
+
+The app centers on direct graph manipulation and algorithm playback:
+
+- edit nodes/edges on-canvas
+- run or step through algorithms frame-by-frame
+- inspect internal structures (queue, stack, visited sets, color maps,
+  matchings)
+- compare outcomes against theorem bounds (Brooks, Vizing, Hall,
+  Hajnal-Szemeredi)
 
 ## Pages
 
+- `/` — landing page with project abstract and module launch cards
 - `/bfs` — Breadth-First Search visualizer
+- `/dfs` — Depth-First Search visualizer
+- `/bipartite` — bipartite detection via live 2-coloring
+- `/greedy-color` — greedy vertex coloring (Brooks context)
+- `/edge-color` — edge coloring (Vizing context)
+- `/hall` — Hall's Marriage Theorem via augmenting paths
 - `/hs-algo` — H-S Algorithm / Graph coloring visualizer (see below)
 
 ## H-S Algorithm Simulator
