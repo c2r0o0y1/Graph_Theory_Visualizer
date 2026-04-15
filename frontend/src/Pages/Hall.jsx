@@ -592,7 +592,7 @@ export default function Hall() {
 
   // ---------------- Render ----------------
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 py-8">
+    <div className="algo-dark min-h-screen py-8">
       <div className="container mx-auto px-4 max-w-7xl">
         <header className="mb-6">
           <h1 className="text-3xl font-bold text-slate-800">

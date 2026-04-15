@@ -172,3 +172,220 @@ code {
 .shadow-elevation-3 {
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   PREMIUM DARK THEME  —  applied to all algorithm pages via .algo-dark
+   Non-destructive: overrides only colours, never layout or structure.
+   ───────────────────────────────────────────────────────────────────────── */
+.algo-dark {
+  background: #020617 !important;   /* slate-950 */
+  color: #f1f5f9;                   /* slate-100 */
+  min-height: 100vh;
+}
+
+/* ── Panels / cards ────────────────────────────────────────────────────── */
+.algo-dark .bg-white                { background: #0f172a !important; } /* slate-900 */
+.algo-dark .bg-slate-50             { background: #0f172a !important; }
+.algo-dark .bg-slate-100            { background: #1e293b !important; } /* slate-800 */
+.algo-dark .bg-slate-200            { background: #1e293b !important; }
+.algo-dark .hover\:bg-slate-300:hover { background: #334155 !important; }
+.algo-dark .hover\:bg-slate-100:hover { background: #1e293b !important; }
+
+/* ── Borders ───────────────────────────────────────────────────────────── */
+.algo-dark .border-slate-200        { border-color: #1e293b !important; }
+.algo-dark .border-slate-300        { border-color: #334155 !important; }
+.algo-dark .border-b-2.border-blue-200  { border-color: #1d4ed8 !important; }
+.algo-dark .border-b-2.border-green-200 { border-color: #15803d !important; }
+.algo-dark .border-b-2.border-teal-200  { border-color: #0f766e !important; }
+.algo-dark .border-b-2.border-violet-200 { border-color: #6d28d9 !important; }
+.algo-dark .border-b-2.border-red-200   { border-color: #991b1b !important; }
+
+/* ── Typography ────────────────────────────────────────────────────────── */
+.algo-dark .text-slate-900,
+.algo-dark .text-slate-800          { color: #f1f5f9 !important; }
+.algo-dark .text-slate-700          { color: #cbd5e1 !important; } /* slate-300 */
+.algo-dark .text-slate-600          { color: #94a3b8 !important; } /* slate-400 */
+.algo-dark .text-slate-500          { color: #64748b !important; }
+
+/* ── Inputs / selects ──────────────────────────────────────────────────── */
+.algo-dark input:not([type="range"]),
+.algo-dark select,
+.algo-dark textarea {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f1f5f9 !important;
+}
+.algo-dark input::placeholder,
+.algo-dark textarea::placeholder     { color: #475569 !important; }
+.algo-dark select option             { background: #1e293b; color: #f1f5f9; }
+
+/* ── Focus rings on dark ────────────────────────────────────────────────── */
+.algo-dark input:focus,
+.algo-dark select:focus              { outline-color: #22d3ee !important; }
+
+/* ── SVG canvas ────────────────────────────────────────────────────────── */
+.algo-dark svg.border,
+.algo-dark svg.bg-slate-50          {
+  background: #0f172a !important;
+  border-color: #1e293b !important;
+}
+
+/* ── Coloured callout panels (applications, info) ──────────────────────── */
+.algo-dark .bg-amber-50             { background: rgba(245,158,11,0.08) !important; }
+.algo-dark .bg-emerald-50           { background: rgba(16,185,129,0.08) !important; }
+.algo-dark .bg-rose-50              { background: rgba(244,63,94,0.08)  !important; }
+.algo-dark .bg-blue-50              { background: rgba(59,130,246,0.08) !important; }
+.algo-dark .bg-indigo-50            { background: rgba(99,102,241,0.08) !important; }
+.algo-dark .bg-teal-50              { background: rgba(20,184,166,0.08) !important; }
+.algo-dark .bg-sky-50               { background: rgba(14,165,233,0.08) !important; }
+.algo-dark .bg-violet-50            { background: rgba(139,92,246,0.08) !important; }
+.algo-dark .bg-red-50               { background: rgba(239,68,68,0.08)  !important; }
+.algo-dark .bg-green-50             { background: rgba(34,197,94,0.08)  !important; }
+.algo-dark .bg-pink-50              { background: rgba(236,72,153,0.08) !important; }
+
+/* ── Coloured border overrides for callout panels ──────────────────────── */
+.algo-dark .border-amber-200        { border-color: rgba(245,158,11,0.25)  !important; }
+.algo-dark .border-emerald-200      { border-color: rgba(16,185,129,0.25)  !important; }
+.algo-dark .border-rose-200         { border-color: rgba(244,63,94,0.25)   !important; }
+.algo-dark .border-blue-200         { border-color: rgba(59,130,246,0.25)  !important; }
+.algo-dark .border-teal-200         { border-color: rgba(20,184,166,0.25)  !important; }
+.algo-dark .border-indigo-200       { border-color: rgba(99,102,241,0.25)  !important; }
+.algo-dark .border-sky-200          { border-color: rgba(14,165,233,0.25)  !important; }
+.algo-dark .border-violet-200       { border-color: rgba(139,92,246,0.25)  !important; }
+.algo-dark .border-red-200          { border-color: rgba(239,68,68,0.25)   !important; }
+.algo-dark .border-green-200        { border-color: rgba(34,197,94,0.25)   !important; }
+.algo-dark .border-pink-200         { border-color: rgba(236,72,153,0.25)  !important; }
+.algo-dark .border-cyan-200         { border-color: rgba(34,211,238,0.25)  !important; }
+
+/* ── Coloured text inside callout panels ───────────────────────────────── */
+.algo-dark .text-amber-900          { color: #fcd34d !important; }
+.algo-dark .text-emerald-900        { color: #34d399 !important; }
+.algo-dark .text-teal-900           { color: #2dd4bf !important; }
+.algo-dark .text-rose-900           { color: #fb7185 !important; }
+.algo-dark .text-blue-900           { color: #93c5fd !important; }
+.algo-dark .text-indigo-900         { color: #a5b4fc !important; }
+.algo-dark .text-sky-900            { color: #7dd3fc !important; }
+
+/* ensure body text inside callouts stays readable */
+.algo-dark .text-amber-900\/80,
+.algo-dark .text-teal-900\/80,
+.algo-dark .text-amber-900\/90      { color: #fcd34d !important; opacity: 0.9; }
+
+/* ── Gradient backgrounds (page wrappers) ──────────────────────────────── */
+.algo-dark.bg-gradient-to-br,
+.algo-dark [class*="from-slate-50"],
+.algo-dark [class*="via-white"],
+.algo-dark [class*="to-slate-100"]  { background: #020617 !important; }
+
+/* ── Shadows on dark ───────────────────────────────────────────────────── */
+.algo-dark .shadow,
+.algo-dark .shadow-sm,
+.algo-dark .shadow-elevation-2      {
+  box-shadow: 0 1px 4px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04) !important;
+}
+.algo-dark .shadow-lg               {
+  box-shadow: 0 4px 20px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04) !important;
+}
+
+/* ── State chips / badges ───────────────────────────────────────────────── */
+.algo-dark .bg-emerald-600          { background: #059669 !important; }
+.algo-dark .bg-emerald-100          { background: rgba(16,185,129,0.12) !important; }
+.algo-dark .text-emerald-800        { color: #34d399 !important; }
+.algo-dark .border-emerald-300      { border-color: rgba(16,185,129,0.35) !important; }
+
+/* ── bg-white opacity variants ─────────────────────────────────────────── */
+.algo-dark [class~="bg-white\/80"],
+.algo-dark [class~="bg-white\/90"],
+.algo-dark [class~="bg-white\/95"]  { background-color: #0f172a !important; }
+
+/* ── Gradient card backgrounds — override from/to CSS custom vars ─────── */
+/* Blue */
+.algo-dark [class~="from-blue-50"]   { --tw-gradient-from: rgba(37,99,235,0.18)  !important; }
+.algo-dark [class~="from-blue-100"]  { --tw-gradient-from: rgba(37,99,235,0.22)  !important; }
+.algo-dark [class~="to-blue-100"]    { --tw-gradient-to:   rgba(37,99,235,0.28)  !important; }
+.algo-dark [class~="to-blue-200"]    { --tw-gradient-to:   rgba(37,99,235,0.32)  !important; }
+/* Green */
+.algo-dark [class~="from-green-50"]  { --tw-gradient-from: rgba(22,163,74,0.18)  !important; }
+.algo-dark [class~="from-green-100"] { --tw-gradient-from: rgba(22,163,74,0.22)  !important; }
+.algo-dark [class~="to-green-100"]   { --tw-gradient-to:   rgba(22,163,74,0.28)  !important; }
+.algo-dark [class~="to-green-200"]   { --tw-gradient-to:   rgba(22,163,74,0.32)  !important; }
+/* Purple */
+.algo-dark [class~="from-purple-50"] { --tw-gradient-from: rgba(147,51,234,0.18) !important; }
+.algo-dark [class~="from-purple-100"]{ --tw-gradient-from: rgba(147,51,234,0.22) !important; }
+.algo-dark [class~="to-purple-100"]  { --tw-gradient-to:   rgba(147,51,234,0.28) !important; }
+.algo-dark [class~="to-purple-200"]  { --tw-gradient-to:   rgba(147,51,234,0.32) !important; }
+/* Red / Rose */
+.algo-dark [class~="from-red-50"]    { --tw-gradient-from: rgba(220,38,38,0.18)  !important; }
+.algo-dark [class~="from-red-100"]   { --tw-gradient-from: rgba(220,38,38,0.22)  !important; }
+.algo-dark [class~="to-red-100"]     { --tw-gradient-to:   rgba(220,38,38,0.28)  !important; }
+.algo-dark [class~="to-red-200"]     { --tw-gradient-to:   rgba(220,38,38,0.32)  !important; }
+/* Orange */
+.algo-dark [class~="from-orange-50"] { --tw-gradient-from: rgba(234,88,12,0.18)  !important; }
+.algo-dark [class~="from-orange-100"]{ --tw-gradient-from: rgba(234,88,12,0.22)  !important; }
+.algo-dark [class~="to-orange-100"]  { --tw-gradient-to:   rgba(234,88,12,0.28)  !important; }
+.algo-dark [class~="to-orange-200"]  { --tw-gradient-to:   rgba(234,88,12,0.32)  !important; }
+/* Yellow / Amber */
+.algo-dark [class~="from-yellow-50"] { --tw-gradient-from: rgba(202,138,4,0.18)  !important; }
+.algo-dark [class~="from-yellow-100"]{ --tw-gradient-from: rgba(202,138,4,0.22)  !important; }
+.algo-dark [class~="to-yellow-100"]  { --tw-gradient-to:   rgba(202,138,4,0.28)  !important; }
+.algo-dark [class~="to-yellow-200"]  { --tw-gradient-to:   rgba(202,138,4,0.32)  !important; }
+.algo-dark [class~="from-amber-50"]  { --tw-gradient-from: rgba(202,138,4,0.15)  !important; }
+.algo-dark [class~="from-amber-100"] { --tw-gradient-from: rgba(202,138,4,0.20)  !important; }
+.algo-dark [class~="to-amber-100"]   { --tw-gradient-to:   rgba(202,138,4,0.25)  !important; }
+.algo-dark [class~="to-amber-200"]   { --tw-gradient-to:   rgba(202,138,4,0.30)  !important; }
+/* Indigo */
+.algo-dark [class~="from-indigo-50"] { --tw-gradient-from: rgba(79,70,229,0.18)  !important; }
+.algo-dark [class~="from-indigo-100"]{ --tw-gradient-from: rgba(79,70,229,0.22)  !important; }
+.algo-dark [class~="to-indigo-100"]  { --tw-gradient-to:   rgba(79,70,229,0.28)  !important; }
+.algo-dark [class~="to-indigo-200"]  { --tw-gradient-to:   rgba(79,70,229,0.32)  !important; }
+/* Teal / Cyan */
+.algo-dark [class~="from-teal-50"]   { --tw-gradient-from: rgba(20,184,166,0.18) !important; }
+.algo-dark [class~="to-teal-100"]    { --tw-gradient-to:   rgba(20,184,166,0.28) !important; }
+.algo-dark [class~="from-cyan-50"]   { --tw-gradient-from: rgba(34,211,238,0.18) !important; }
+.algo-dark [class~="to-cyan-100"]    { --tw-gradient-to:   rgba(34,211,238,0.28) !important; }
+
+/* ── Text inside tinted gradient cards — ensure readable contrast ──────── */
+.algo-dark [class~="from-blue-50"]   .text-slate-700,
+.algo-dark [class~="from-green-50"]  .text-slate-700,
+.algo-dark [class~="from-purple-50"] .text-slate-700,
+.algo-dark [class~="from-red-50"]    .text-slate-700,
+.algo-dark [class~="from-orange-50"] .text-slate-700,
+.algo-dark [class~="from-yellow-50"] .text-slate-700,
+.algo-dark [class~="from-amber-50"]  .text-slate-700,
+.algo-dark [class~="from-indigo-50"] .text-slate-700 { color: #94a3b8 !important; }
+
+/* Also fix the lighter label variant used in stat panels */
+.algo-dark [class~="from-blue-50"]   .text-slate-500,
+.algo-dark [class~="from-green-50"]  .text-slate-500,
+.algo-dark [class~="from-purple-50"] .text-slate-500,
+.algo-dark [class~="from-red-50"]    .text-slate-500,
+.algo-dark [class~="from-orange-50"] .text-slate-500,
+.algo-dark [class~="from-yellow-50"] .text-slate-500,
+.algo-dark [class~="from-amber-50"]  .text-slate-500,
+.algo-dark [class~="from-indigo-50"] .text-slate-500 { color: #64748b !important; }
+
+/* ── Coloured text in tinted cards — keep vivid, boost brightness ──────── */
+.algo-dark .text-blue-600            { color: #60a5fa !important; }
+.algo-dark .text-green-600           { color: #4ade80 !important; }
+.algo-dark .text-purple-600          { color: #c084fc !important; }
+.algo-dark .text-red-600             { color: #f87171 !important; }
+.algo-dark .text-orange-600          { color: #fb923c !important; }
+.algo-dark .text-yellow-600          { color: #facc15 !important; }
+.algo-dark .text-amber-600           { color: #fbbf24 !important; }
+.algo-dark .text-indigo-600          { color: #818cf8 !important; }
+.algo-dark .text-teal-600            { color: #2dd4bf !important; }
+.algo-dark .text-cyan-600            { color: #22d3ee !important; }
+
+/* ── bg-* solid light shades (100/200) ─────────────────────────────────── */
+.algo-dark .bg-blue-100              { background: rgba(37,99,235,0.15)  !important; }
+.algo-dark .bg-green-100             { background: rgba(22,163,74,0.15)  !important; }
+.algo-dark .bg-purple-100            { background: rgba(147,51,234,0.15) !important; }
+.algo-dark .bg-red-100               { background: rgba(220,38,38,0.15)  !important; }
+.algo-dark .bg-orange-100            { background: rgba(234,88,12,0.15)  !important; }
+.algo-dark .bg-yellow-100            { background: rgba(202,138,4,0.15)  !important; }
+.algo-dark .bg-amber-100             { background: rgba(202,138,4,0.12)  !important; }
+.algo-dark .bg-indigo-100            { background: rgba(79,70,229,0.15)  !important; }
+.algo-dark .bg-blue-200              { background: rgba(37,99,235,0.20)  !important; }
+.algo-dark .bg-green-200             { background: rgba(22,163,74,0.20)  !important; }
+.algo-dark .bg-purple-200            { background: rgba(147,51,234,0.20) !important; }
+.algo-dark .bg-yellow-200            { background: rgba(202,138,4,0.20)  !important; }

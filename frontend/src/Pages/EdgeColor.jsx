@@ -626,7 +626,7 @@ export default function EdgeColor() {
   /* ------------------- JSX ------------------- */
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 py-8">
+    <div className="algo-dark min-h-screen py-8">
       <div className="container mx-auto px-4 max-w-7xl">
         {/* Header */}
         <header className="mb-6">

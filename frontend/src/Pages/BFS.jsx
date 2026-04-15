@@ -1201,7 +1201,7 @@ export default function BFS() {
         />
       </div>
       
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 custom-scrollbar overflow-y-auto scroll-smooth">
+      <div className="algo-dark min-h-screen custom-scrollbar overflow-y-auto scroll-smooth">
         <div className="container mx-auto px-4 py-8 custom-scrollbar">
           
           {/* Navigation Progress Indicator */}

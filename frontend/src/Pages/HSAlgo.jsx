@@ -706,7 +706,7 @@ export default function HSAlgo() {
   /* ════════════════════════ RENDER ════════════════════════ */
   return (
     <>
-      <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-stone-50">
+      <main className="algo-dark min-h-screen">
         <div className="max-w-[1440px] mx-auto px-4 sm:px-6 py-6 space-y-5">
 
           {/* ── header ── */}

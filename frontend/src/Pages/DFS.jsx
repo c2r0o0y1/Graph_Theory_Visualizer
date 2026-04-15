@@ -470,7 +470,7 @@ export default function DFS() {
 
   // ---------- Layout ----------
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 py-8">
+    <div className="algo-dark min-h-screen py-8">
       <div className="container mx-auto px-4 max-w-7xl">
         {/* Header */}
         <div className="bg-white rounded-lg shadow border border-slate-200 p-6 mb-6">
