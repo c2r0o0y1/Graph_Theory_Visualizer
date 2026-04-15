@@ -1,23 +1,33 @@
-# Graph Theory Visualizer
+# Designing a Graph Theory Visualizer: Making Abstract Structures Tangible
 
-An interactive React app for exploring graph-theory algorithms as live
-processes, not static notation.
+**Suman Dangal\*** · **Saharsha Pandey** · **Chhandak Roy '24**
 
-Most graph theory courses give you notation: definitions, theorem statements,
-adjacency matrices. What they do not show is what an algorithm is doing while
-it runs. This project is built around that gap. You can watch BFS grow by
-layers, DFS commit down branches and backtrack, bipartite checking fail at the
-exact conflict edge, and matching/coloring algorithms reveal their internal
-state one step at a time.
+## The Abstract
 
-The app centers on direct graph manipulation and algorithm playback:
+Graph theory fundamentally deals with dynamic, evolving structures, yet we
+still largely teach it using static textbook diagrams and chalkboard
+proofs. For students, mentally simulating how a complex algorithm alters a
+network step-by-step can be exhausting. This cognitive overload often
+leads to an "illusion of understanding," where learners passively watch a
+process without truly grasping the underlying logic.
 
-- edit nodes/edges on-canvas
-- run or step through algorithms frame-by-frame
-- inspect internal structures (queue, stack, visited sets, color maps,
-  matchings)
-- compare outcomes against theorem bounds (Brooks, Vizing, Hall,
-  Hajnal-Szemeredi)
+To bridge this gap, we introduce a highly interactive visualization system
+that turns graph theory from a passive reading exercise into a hands-on,
+exploratory lab. Powered by a click-and-control layout engine, the tool
+allows users to build graphs on a canvas and manipulate them in real time.
+Our platform goes beyond traversal algorithms like Breadth-First and
+Depth-First Search, uniquely extending into advanced combinatorics. It
+enables the user to visualize complex proofs, like Hall's marriage
+theorem, the four color theorem, Vizing's theorem, and the
+polynomial-time Kierstead–Kostochka algorithm for the Hajnal–Szemerédi
+Theorem — by translating dense algebraic logic into intuitive spatial
+puzzles.
+
+We let software do the heavy lifting of tracking the algorithm's state,
+so that students' brains can actually grasp the concept. Ultimately, this
+active approach fosters a more collaborative and inclusive learning
+environment. This helps to access advanced discrete mathematics allowing
+students to see algorithmic state: step-by-step.
 
 ## Pages
 
@@ -26,9 +36,10 @@ The app centers on direct graph manipulation and algorithm playback:
 - `/dfs` — Depth-First Search visualizer
 - `/bipartite` — bipartite detection via live 2-coloring
 - `/greedy-color` — greedy vertex coloring (Brooks context)
-- `/edge-color` — edge coloring (Vizing context)
+- `/edge-color` — edge coloring (Vizing's theorem)
+- `/four-color` — Four Color Theorem on planar graphs
 - `/hall` — Hall's Marriage Theorem via augmenting paths
-- `/hs-algo` — H-S Algorithm / Graph coloring visualizer (see below)
+- `/hs-algo` — Kierstead–Kostochka algorithm (Hajnal–Szemerédi)
 
 ## H-S Algorithm Simulator
 

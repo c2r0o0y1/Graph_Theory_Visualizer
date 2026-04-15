@@ -640,42 +640,31 @@ export default function DFS() {
                 onClick={runDFS}
                 className="w-full bg-amber-500 hover:bg-amber-600 text-white rounded-lg py-2 text-sm font-semibold shadow mb-2"
               >
-                Run DFS
+                ▶ Run DFS
               </button>
               <div className="grid grid-cols-4 gap-1 mb-2">
                 <button
                   onClick={() => setStepIdx((i) => Math.max(0, i - 1))}
                   disabled={steps.length === 0}
                   className="bg-slate-200 hover:bg-slate-300 disabled:opacity-50 rounded py-1 text-xs"
-                >
-                  ◀ Step
-                </button>
+                >◀</button>
                 <button
                   onClick={() => setPlaying((p) => !p)}
                   disabled={steps.length === 0}
                   className="bg-green-500 hover:bg-green-600 disabled:opacity-50 text-white rounded py-1 text-xs"
                 >
-                  {playing ? "Pause" : "Play"}
+                  {playing ? "❚❚" : "▶ Run"}
                 </button>
                 <button
-                  onClick={() =>
-                    setStepIdx((i) => Math.min(steps.length - 1, i + 1))
-                  }
+                  onClick={() => setStepIdx((i) => Math.min(steps.length - 1, i + 1))}
                   disabled={steps.length === 0}
                   className="bg-slate-200 hover:bg-slate-300 disabled:opacity-50 rounded py-1 text-xs"
-                >
-                  Step ▶
-                </button>
+                >▶</button>
                 <button
-                  onClick={() => {
-                    setStepIdx(0);
-                    setPlaying(false);
-                  }}
+                  onClick={() => { setStepIdx(0); setPlaying(false); }}
                   disabled={steps.length === 0}
                   className="bg-red-400 hover:bg-red-500 disabled:opacity-50 text-white rounded py-1 text-xs"
-                >
-                  Reset
-                </button>
+                >⟲</button>
               </div>
               <div className="flex items-center gap-2">
                 <label className="text-xs text-slate-600">Speed</label>
@@ -732,8 +721,8 @@ export default function DFS() {
             <div className="bg-white rounded-lg shadow border border-slate-200 p-4">
               <svg
                 ref={svgRef}
-                width={CANVAS_W}
-                height={CANVAS_H}
+                width="100%"
+                preserveAspectRatio="xMidYMid meet"
                 viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}
                 className="w-full border border-slate-200 rounded-lg bg-slate-50"
               >

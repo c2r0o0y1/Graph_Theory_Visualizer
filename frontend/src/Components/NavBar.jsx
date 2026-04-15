@@ -1,22 +1,23 @@
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 
+const links = [
+  { to: '/', label: 'Home', end: true },
+  { to: '/bfs', label: 'BFS' },
+  { to: '/dfs', label: 'DFS' },
+  { to: '/bipartite', label: 'Bipartite' },
+  { to: '/greedy-color', label: 'Greedy Color' },
+  { to: '/edge-color', label: 'Edge Color' },
+  { to: '/four-color', label: '4-Color' },
+  { to: '/hall', label: "Hall's Marriage" },
+  { to: '/hs-algo', label: 'H-S Equitable' },
+];
+
 export default function Navbar() {
   const [open, setOpen] = useState(false);
 
-  const navItems = [
-    { to: '/', label: 'Home', icon: 'M3 12l9-9 9 9M4 10v10h16V10' },
-    { to: '/bfs', label: 'BFS', icon: 'M13 10V3L4 14h7v7l9-11h-7z' },
-    { to: '/dfs', label: 'DFS', icon: 'M5 12h14M12 5l7 7-7 7' },
-    { to: '/bipartite', label: 'Bipartite', icon: 'M4 7h6v6H4zM14 11h6v6h-6zM10 10l4 2' },
-    { to: '/greedy-color', label: 'Greedy Color', icon: 'M12 3v18M3 12h18M5 5l14 14' },
-    { to: '/edge-color', label: 'Edge Color', icon: 'M4 6l6 6m0 0l10-6m-10 6l10 8' },
-    { to: '/hall', label: "Hall's Theorem", icon: 'M4 7h6v6H4zM14 7h6v6h-6zM10 10h4M7 13v4m10-4v4' },
-    { to: '/hs-algo', label: 'H-S Algo', icon: 'M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zM21 5a2 2 0 00-2-2h-4a2 2 0 00-2 2v12a4 4 0 004 4h4a2 2 0 002-2V5z' },
-  ];
-
   const linkBase =
-    'px-3 py-2 rounded-md text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500';
+    'px-3 py-2 rounded-md text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 whitespace-nowrap';
   const linkStyles = ({ isActive }) =>
     [
       linkBase,
@@ -27,7 +28,6 @@ export default function Navbar() {
     <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm">
       <nav className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
-          {/* Brand */}
           <div className="flex items-center gap-3">
             <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 text-white font-bold shadow-md">
               G
@@ -38,24 +38,17 @@ export default function Navbar() {
             </div>
           </div>
 
-          {/* Desktop links */}
-          <div className="hidden md:flex items-center gap-1 overflow-x-auto py-2">
-            {navItems.map((item) => (
-              <NavLink key={item.to} to={item.to} className={linkStyles}>
-                <span className="flex items-center gap-2 whitespace-nowrap">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
-                  </svg>
-                  {item.label}
-                </span>
+          <div className="hidden lg:flex items-center gap-1 overflow-x-auto">
+            {links.map(l => (
+              <NavLink key={l.to} to={l.to} end={l.end} className={linkStyles}>
+                {l.label}
               </NavLink>
             ))}
           </div>
 
-          {/* Mobile toggle */}
           <button
             type="button"
-            className="md:hidden inline-flex items-center justify-center p-2.5 rounded-lg text-slate-600 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+            className="lg:hidden inline-flex items-center justify-center p-2.5 rounded-lg text-slate-600 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
             aria-controls="primary-nav"
             aria-expanded={open}
             onClick={() => setOpen(v => !v)}
@@ -71,17 +64,11 @@ export default function Navbar() {
           </button>
         </div>
 
-        {/* Mobile menu */}
-        <div id="primary-nav" className={`${open ? 'block' : 'hidden'} md:hidden pb-4 pt-2`}>
+        <div id="primary-nav" className={`${open ? 'block' : 'hidden'} lg:hidden pb-4 pt-2`}>
           <div className="flex flex-col gap-1 bg-slate-50 rounded-lg p-2">
-            {navItems.map((item) => (
-              <NavLink key={item.to} to={item.to} className={linkStyles} onClick={() => setOpen(false)}>
-                <span className="flex items-center gap-2">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
-                  </svg>
-                  {item.label}
-                </span>
+            {links.map(l => (
+              <NavLink key={l.to} to={l.to} end={l.end} className={linkStyles} onClick={() => setOpen(false)}>
+                {l.label}
               </NavLink>
             ))}
           </div>

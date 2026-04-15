@@ -247,9 +247,25 @@ const Legend = memo(function Legend({ counts }) {
 
 /* ----------------------------- Main Component ----------------------------- */
 
+// Seed with K_4 so the canvas has something to show on mount.
+const SEED_NODES = [
+  { id: 1, x: 250, y: 120 },
+  { id: 2, x: 550, y: 120 },
+  { id: 3, x: 550, y: 380 },
+  { id: 4, x: 250, y: 380 },
+];
+const SEED_EDGES = [
+  { id: 1, from: 1, to: 2 },
+  { id: 2, from: 1, to: 3 },
+  { id: 3, from: 1, to: 4 },
+  { id: 4, from: 2, to: 3 },
+  { id: 5, from: 2, to: 4 },
+  { id: 6, from: 3, to: 4 },
+];
+
 export default function EdgeColor() {
-  const [nodes, setNodes] = useState([]);
-  const [edges, setEdges] = useState([]);
+  const [nodes, setNodes] = useState(SEED_NODES);
+  const [edges, setEdges] = useState(SEED_EDGES);
   const [history, setHistory] = useState([]);
   const [stepIdx, setStepIdx] = useState(-1); // -1 means before any step
   const [running, setRunning] = useState(false);
@@ -724,7 +740,7 @@ export default function EdgeColor() {
                   onClick={clearAll}
                   className="w-full bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm px-3 py-1 rounded"
                 >
-                  Clear graph
+                  Clear All
                 </button>
               </div>
             </div>
@@ -804,42 +820,32 @@ export default function EdgeColor() {
                 </option>
               </select>
 
-              <div className="grid grid-cols-2 gap-2 mb-3">
+              <div className="grid grid-cols-4 gap-2 mb-3">
+                <button
+                  onClick={handleStepBack}
+                  className="bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm px-2 py-1.5 rounded"
+                  disabled={stepIdx < 0}
+                >◀</button>
                 {!running ? (
                   <button
                     onClick={handleRun}
                     className="bg-teal-600 hover:bg-teal-700 text-white text-sm px-3 py-1.5 rounded col-span-2"
-                  >
-                    ▶ Run
-                  </button>
+                  >▶ Run</button>
                 ) : (
                   <button
                     onClick={handlePause}
                     className="bg-amber-500 hover:bg-amber-600 text-white text-sm px-3 py-1.5 rounded col-span-2"
-                  >
-                    ❚❚ Pause
-                  </button>
+                  >❚❚ Pause</button>
                 )}
                 <button
-                  onClick={handleStepBack}
-                  className="bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm px-2 py-1 rounded"
-                  disabled={stepIdx < 0}
-                >
-                  ◀ Step
-                </button>
-                <button
                   onClick={handleStepFwd}
-                  className="bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm px-2 py-1 rounded"
+                  className="bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm px-2 py-1.5 rounded"
                   disabled={stepIdx >= history.length - 1}
-                >
-                  Step ▶
-                </button>
+                >▶</button>
                 <button
                   onClick={handleReset}
-                  className="bg-rose-500 hover:bg-rose-600 text-white text-sm px-3 py-1 rounded col-span-2"
-                >
-                  Reset
-                </button>
+                  className="bg-rose-500 hover:bg-rose-600 text-white text-sm px-3 py-1.5 rounded col-span-4"
+                >⟲ Reset</button>
               </div>
 
               <label className="block text-xs text-slate-600 mb-1">

@@ -626,33 +626,29 @@ export default function Bipartite() {
             {/* Playback */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
               <h2 className="font-semibold text-slate-800 mb-3">Playback</h2>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setStepIdx((i) => Math.max(0, i - 1))}
+                  disabled={!history}
+                  className="flex-1 px-3 py-2 rounded-md bg-slate-200 text-slate-800 text-sm font-medium hover:bg-slate-300 disabled:opacity-40"
+                >◀</button>
                 <button
                   onClick={() => setPlaying((p) => !p)}
-                  className="px-3 py-2 rounded-md bg-blue-600 text-white text-sm font-medium hover:bg-blue-700"
+                  disabled={!history}
+                  className="flex-1 px-3 py-2 rounded-md bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-40"
                 >
-                  {playing ? "Pause" : "Play"}
+                  {playing ? "❚❚ Pause" : "▶ Run"}
                 </button>
                 <button
-                  onClick={() =>
-                    setStepIdx((i) =>
-                      Math.min((history?.steps.length || 1) - 1, i + 1)
-                    )
-                  }
-                  className="px-3 py-2 rounded-md bg-slate-200 text-slate-800 text-sm font-medium hover:bg-slate-300"
-                >
-                  Step
-                </button>
+                  onClick={() => setStepIdx((i) => Math.min((history?.steps.length || 1) - 1, i + 1))}
+                  disabled={!history}
+                  className="flex-1 px-3 py-2 rounded-md bg-slate-200 text-slate-800 text-sm font-medium hover:bg-slate-300 disabled:opacity-40"
+                >▶</button>
                 <button
-                  onClick={() => {
-                    setStepIdx(0);
-                    setPlaying(false);
-                    setPartitionView(false);
-                  }}
-                  className="px-3 py-2 rounded-md bg-slate-200 text-slate-800 text-sm font-medium hover:bg-slate-300"
-                >
-                  Reset
-                </button>
+                  onClick={() => { setStepIdx(0); setPlaying(false); setPartitionView(false); }}
+                  disabled={!history}
+                  className="flex-1 px-3 py-2 rounded-md bg-slate-200 text-slate-800 text-sm font-medium hover:bg-slate-300 disabled:opacity-40"
+                >⟲</button>
               </div>
               <div className="mt-3">
                 <label className="block text-xs text-slate-600 mb-1">
@@ -711,7 +707,7 @@ export default function Bipartite() {
                   onClick={addNode}
                   className="px-3 py-1.5 rounded-md bg-emerald-600 text-white text-sm"
                 >
-                  Add
+                  + Node
                 </button>
               </div>
               <div className="flex gap-2 mb-2">
@@ -739,7 +735,7 @@ export default function Bipartite() {
                   onClick={deleteNode}
                   className="px-3 py-1.5 rounded-md bg-rose-600 text-white text-sm"
                 >
-                  Delete
+                  − Node
                 </button>
               </div>
             </div>
@@ -764,7 +760,7 @@ export default function Bipartite() {
                   onClick={addEdge}
                   className="flex-1 px-3 py-1.5 rounded-md bg-emerald-600 text-white text-sm"
                 >
-                  Add
+                  + Edge
                 </button>
               </div>
               <div className="flex gap-2">
@@ -784,7 +780,7 @@ export default function Bipartite() {
                   onClick={deleteEdge}
                   className="flex-1 px-3 py-1.5 rounded-md bg-rose-600 text-white text-sm"
                 >
-                  Delete
+                  − Edge
                 </button>
               </div>
             </div>
@@ -874,7 +870,7 @@ export default function Bipartite() {
                 onClick={clearAll}
                 className="w-full px-3 py-1.5 rounded-md bg-slate-700 text-white text-sm"
               >
-                Clear everything
+                Clear All
               </button>
             </div>
 

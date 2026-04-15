@@ -678,7 +678,7 @@ export default function Hall() {
                     className="px-3 py-1 bg-slate-600 text-white rounded hover:bg-slate-700"
                     onClick={deleteNode}
                   >
-                    Del Node
+                    − Node
                   </button>
                 </div>
                 <div className="flex gap-2">
@@ -774,36 +774,25 @@ export default function Hall() {
 
             <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
               <h2 className="font-semibold text-slate-800 mb-3">Playback</h2>
-              <div className="flex flex-wrap gap-2 text-sm">
-                <button
-                  onClick={() => setPlaying((p) => !p)}
-                  className="px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-                >
-                  {playing ? "Pause" : "Run"}
-                </button>
-                <button
-                  onClick={() =>
-                    setStepIdx((i) => Math.min(steps.length - 1, i + 1))
-                  }
-                  className="px-3 py-1 bg-slate-600 text-white rounded hover:bg-slate-700"
-                >
-                  Step ▶
-                </button>
+              <div className="grid grid-cols-4 gap-2 text-sm">
                 <button
                   onClick={() => setStepIdx((i) => Math.max(0, i - 1))}
-                  className="px-3 py-1 bg-slate-600 text-white rounded hover:bg-slate-700"
+                  className="px-3 py-1.5 bg-slate-200 text-slate-700 rounded hover:bg-slate-300"
+                >◀</button>
+                <button
+                  onClick={() => setPlaying((p) => !p)}
+                  className="col-span-2 px-3 py-1.5 bg-indigo-600 text-white rounded hover:bg-indigo-700"
                 >
-                  ◀ Back
+                  {playing ? "❚❚ Pause" : "▶ Run"}
                 </button>
                 <button
-                  onClick={() => {
-                    setStepIdx(0);
-                    setPlaying(false);
-                  }}
-                  className="px-3 py-1 bg-rose-500 text-white rounded hover:bg-rose-600"
-                >
-                  Reset
-                </button>
+                  onClick={() => setStepIdx((i) => Math.min(steps.length - 1, i + 1))}
+                  className="px-3 py-1.5 bg-slate-200 text-slate-700 rounded hover:bg-slate-300"
+                >▶</button>
+                <button
+                  onClick={() => { setStepIdx(0); setPlaying(false); }}
+                  className="col-span-4 px-3 py-1.5 bg-rose-500 text-white rounded hover:bg-rose-600"
+                >⟲ Reset</button>
               </div>
               <label className="block mt-3 text-sm text-slate-600">
                 Speed: {speed} ms

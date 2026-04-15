@@ -7,6 +7,7 @@ import DFS from './Pages/DFS';
 import Bipartite from './Pages/Bipartite';
 import GreedyColor from './Pages/GreedyColor';
 import EdgeColor from './Pages/EdgeColor';
+import FourColor from './Pages/FourColor';
 import Hall from './Pages/Hall';
 import HSAlgo from './Pages/HSAlgo';
 
@@ -21,6 +22,7 @@ export default function App() {
         <Route path="/bipartite" element={<Bipartite />} />
         <Route path="/greedy-color" element={<GreedyColor />} />
         <Route path="/edge-color" element={<EdgeColor />} />
+        <Route path="/four-color" element={<FourColor />} />
         <Route path="/hall" element={<Hall />} />
         <Route path="/hs-algo" element={<HSAlgo />} />
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -348,6 +348,45 @@ export default function GreedyColor() {
     return () => clearTimeout(timerRef.current);
   }, [isRunning, step, history, speed]);
 
+  // ---------- drag with boundary clamping ----------
+  const svgRef = useRef(null);
+  const dragRef = useRef({ id: null, ox: 0, oy: 0 });
+  const onNodeDown = (e, id) => {
+    e.preventDefault();
+    const svg = svgRef.current;
+    if (!svg) return;
+    const r = svg.getBoundingClientRect();
+    const n = nodes.find((n) => n.id === id);
+    if (!n) return;
+    const sx = ((e.clientX - r.left) / r.width) * SVG_W;
+    const sy = ((e.clientY - r.top) / r.height) * SVG_H;
+    dragRef.current = { id, ox: sx - n.x, oy: sy - n.y };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+  const onMove = (e) => {
+    if (dragRef.current.id === null) return;
+    const svg = svgRef.current;
+    if (!svg) return;
+    const r = svg.getBoundingClientRect();
+    const sx = ((e.clientX - r.left) / r.width) * SVG_W;
+    const sy = ((e.clientY - r.top) / r.height) * SVG_H;
+    const x = Math.max(NODE_R, Math.min(SVG_W - NODE_R, sx - dragRef.current.ox));
+    const y = Math.max(NODE_R, Math.min(SVG_H - NODE_R, sy - dragRef.current.oy));
+    const id = dragRef.current.id;
+    setNodes((ns) => ns.map((n) => (n.id === id ? { ...n, x, y } : n)));
+  };
+  const onUp = () => {
+    dragRef.current = { id: null, ox: 0, oy: 0 };
+    window.removeEventListener("mousemove", onMove);
+    window.removeEventListener("mouseup", onUp);
+  };
+  useEffect(() => () => {
+    window.removeEventListener("mousemove", onMove);
+    window.removeEventListener("mouseup", onUp);
+    // eslint-disable-next-line
+  }, []);
+
   // ---------- graph operations ----------
   const layoutNodes = useCallback((nodeList) => {
     const pts = circularLayout(nodeList.length);
@@ -678,7 +717,7 @@ export default function GreedyColor() {
               <h2 className="font-semibold text-slate-700 mb-2">Graph Editing</h2>
               <div className="flex gap-2 mb-2">
                 <Btn onClick={addNode} variant="indigo">
-                  + Node
+                  + Add Node
                 </Btn>
                 <TxtInput
                   value={bulkAddCount}
@@ -704,7 +743,7 @@ export default function GreedyColor() {
               <div className="flex gap-2 mb-2">
                 <TxtInput value={delNode} onChange={setDelNode} placeholder="node id" />
                 <Btn onClick={deleteNode} variant="red">
-                  Del Node
+                  − Node
                 </Btn>
               </div>
               <div className="flex gap-2">
@@ -724,14 +763,14 @@ export default function GreedyColor() {
                 <label className="text-xs text-slate-600">Kₙ:</label>
                 <TxtInput value={kInput} onChange={setKInput} placeholder="n" />
                 <Btn onClick={generateKn} variant="violet">
-                  Gen Kₙ
+                  Complete Kₙ
                 </Btn>
               </div>
               <div className="flex gap-1 mb-2 items-center">
                 <label className="text-xs text-slate-600">C<sub>2k+1</sub>:</label>
                 <TxtInput value={cycleInput} onChange={setCycleInput} placeholder="odd n" />
                 <Btn onClick={generateOddCycle} variant="violet">
-                  Odd Cyc
+                  Odd Cycle
                 </Btn>
               </div>
               <div className="flex gap-1 items-center">
@@ -739,7 +778,7 @@ export default function GreedyColor() {
                 <TxtInput value={regN} onChange={setRegN} placeholder="n" />
                 <TxtInput value={regD} onChange={setRegD} placeholder="d" />
                 <Btn onClick={generateRandomRegular} variant="violet">
-                  Reg
+                  d-Regular
                 </Btn>
               </div>
             </div>
@@ -762,24 +801,14 @@ export default function GreedyColor() {
                 <Btn onClick={applyOrdering} variant="emerald">
                   Apply Order
                 </Btn>
+                <Btn onClick={stepBack} variant="slate">◀</Btn>
                 {!isRunning ? (
-                  <Btn onClick={run} variant="indigo">
-                    Run
-                  </Btn>
+                  <Btn onClick={run} variant="indigo">▶ Run</Btn>
                 ) : (
-                  <Btn onClick={pause} variant="amber">
-                    Pause
-                  </Btn>
+                  <Btn onClick={pause} variant="amber">❚❚ Pause</Btn>
                 )}
-                <Btn onClick={stepBack} variant="slate">
-                  ◀ Step
-                </Btn>
-                <Btn onClick={stepForward} variant="slate">
-                  Step ▶
-                </Btn>
-                <Btn onClick={reset} variant="red">
-                  Reset
-                </Btn>
+                <Btn onClick={stepForward} variant="slate">▶</Btn>
+                <Btn onClick={reset} variant="red">⟲</Btn>
               </div>
               <div>
                 <label className="text-xs text-slate-600">
@@ -885,6 +914,7 @@ export default function GreedyColor() {
           <div className="lg:col-span-2 space-y-4">
             <div className="bg-white rounded-lg shadow p-2 border border-slate-200">
               <svg
+                ref={svgRef}
                 width="100%"
                 viewBox={`0 0 ${SVG_W} ${SVG_H}`}
                 className="bg-slate-50 rounded"
@@ -920,7 +950,7 @@ export default function GreedyColor() {
                   const fill =
                     c > 0 ? PALETTE[(c - 1) % PALETTE.length] : "#cbd5e1";
                   return (
-                    <g key={n.id}>
+                    <g key={n.id} onMouseDown={(e) => onNodeDown(e, n.id)} style={{ cursor: "grab" }}>
                       <circle
                         cx={n.x}
                         cy={n.y}
