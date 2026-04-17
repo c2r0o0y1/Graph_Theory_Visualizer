@@ -609,11 +609,11 @@ export default function Bipartite() {
     <div className="algo-dark min-h-screen py-8">
       <div className="container mx-auto px-4 max-w-7xl">
         {/* Header */}
-        <header className="mb-6">
-          <h1 className="text-3xl md:text-4xl font-bold text-slate-800">
+        <header className="mb-4">
+          <h1 className="text-2xl font-bold text-slate-100">
             Bipartite Detection & 2-Coloring
           </h1>
-          <p className="mt-2 text-slate-600">
+          <p className="mt-1 text-slate-400 text-sm">
             A BFS that colors as it goes. A clean result confirms the partition;
             a conflict shows exactly where and why it fails.
           </p>
@@ -624,13 +624,13 @@ export default function Bipartite() {
           {/* Controls */}
           <aside className="lg:col-span-1 space-y-4">
             {/* Playback */}
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-              <h2 className="font-semibold text-slate-800 mb-3">Playback</h2>
+            <div className="bg-slate-900 rounded-xl border border-slate-800 p-4">
+              <h2 className="font-semibold text-slate-100 mb-3">Playback</h2>
               <div className="flex gap-2">
                 <button
                   onClick={() => setStepIdx((i) => Math.max(0, i - 1))}
                   disabled={!history}
-                  className="flex-1 px-3 py-2 rounded-md bg-slate-200 text-slate-800 text-sm font-medium hover:bg-slate-300 disabled:opacity-40"
+                  className="flex-1 px-3 py-2 rounded-md bg-slate-200 text-slate-100 text-sm font-medium hover:bg-slate-300 disabled:opacity-40"
                 >◀</button>
                 <button
                   onClick={() => setPlaying((p) => !p)}
@@ -642,16 +642,16 @@ export default function Bipartite() {
                 <button
                   onClick={() => setStepIdx((i) => Math.min((history?.steps.length || 1) - 1, i + 1))}
                   disabled={!history}
-                  className="flex-1 px-3 py-2 rounded-md bg-slate-200 text-slate-800 text-sm font-medium hover:bg-slate-300 disabled:opacity-40"
+                  className="flex-1 px-3 py-2 rounded-md bg-slate-200 text-slate-100 text-sm font-medium hover:bg-slate-300 disabled:opacity-40"
                 >▶</button>
                 <button
                   onClick={() => { setStepIdx(0); setPlaying(false); setPartitionView(false); }}
                   disabled={!history}
-                  className="flex-1 px-3 py-2 rounded-md bg-slate-200 text-slate-800 text-sm font-medium hover:bg-slate-300 disabled:opacity-40"
+                  className="flex-1 px-3 py-2 rounded-md bg-slate-200 text-slate-100 text-sm font-medium hover:bg-slate-300 disabled:opacity-40"
                 >⟲</button>
               </div>
               <div className="mt-3">
-                <label className="block text-xs text-slate-600 mb-1">
+                <label className="block text-xs text-slate-400 mb-1">
                   Speed: {speed}ms
                 </label>
                 <input
@@ -665,13 +665,13 @@ export default function Bipartite() {
                 />
               </div>
               <div className="mt-3">
-                <label className="block text-xs text-slate-600 mb-1">
+                <label className="block text-xs text-slate-400 mb-1">
                   Start node
                 </label>
                 <select
                   value={startNode}
                   onChange={(e) => setStartNode(e.target.value)}
-                  className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded-md"
+                  className="w-full px-2 py-1.5 text-sm border border-slate-600 rounded-md"
                 >
                   {nodes.map((n) => (
                     <option key={n.id} value={n.id}>
@@ -687,21 +687,21 @@ export default function Bipartite() {
                   checked={partitionView}
                   onChange={(e) => setPartitionView(e.target.checked)}
                 />
-                <label htmlFor="pview" className="text-xs text-slate-700">
+                <label htmlFor="pview" className="text-xs text-slate-300">
                   Free layout ↔ Partition view
                 </label>
               </div>
             </div>
 
             {/* Edit nodes */}
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-              <h2 className="font-semibold text-slate-800 mb-3">Nodes</h2>
+            <div className="bg-slate-900 rounded-xl border border-slate-800 p-4">
+              <h2 className="font-semibold text-slate-100 mb-3">Nodes</h2>
               <div className="flex gap-2 mb-2">
                 <input
                   value={nodeInput}
                   onChange={(e) => setNodeInput(e.target.value)}
                   placeholder="id"
-                  className="flex-1 px-2 py-1.5 text-sm border border-slate-300 rounded-md"
+                  className="flex-1 px-2 py-1.5 text-sm border border-slate-600 rounded-md"
                 />
                 <button
                   onClick={addNode}
@@ -715,7 +715,7 @@ export default function Bipartite() {
                   value={bulkInput}
                   onChange={(e) => setBulkInput(e.target.value)}
                   placeholder="A,B,C"
-                  className="flex-1 px-2 py-1.5 text-sm border border-slate-300 rounded-md"
+                  className="flex-1 px-2 py-1.5 text-sm border border-slate-600 rounded-md"
                 />
                 <button
                   onClick={bulkAdd}
@@ -729,7 +729,7 @@ export default function Bipartite() {
                   value={delNode}
                   onChange={(e) => setDelNode(e.target.value)}
                   placeholder="id to delete"
-                  className="flex-1 px-2 py-1.5 text-sm border border-slate-300 rounded-md"
+                  className="flex-1 px-2 py-1.5 text-sm border border-slate-600 rounded-md"
                 />
                 <button
                   onClick={deleteNode}
@@ -741,20 +741,20 @@ export default function Bipartite() {
             </div>
 
             {/* Edit edges */}
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-              <h2 className="font-semibold text-slate-800 mb-3">Edges</h2>
+            <div className="bg-slate-900 rounded-xl border border-slate-800 p-4">
+              <h2 className="font-semibold text-slate-100 mb-3">Edges</h2>
               <div className="flex gap-2 mb-2">
                 <input
                   value={edgeFrom}
                   onChange={(e) => setEdgeFrom(e.target.value)}
                   placeholder="from"
-                  className="w-1/3 px-2 py-1.5 text-sm border border-slate-300 rounded-md"
+                  className="w-1/3 px-2 py-1.5 text-sm border border-slate-600 rounded-md"
                 />
                 <input
                   value={edgeTo}
                   onChange={(e) => setEdgeTo(e.target.value)}
                   placeholder="to"
-                  className="w-1/3 px-2 py-1.5 text-sm border border-slate-300 rounded-md"
+                  className="w-1/3 px-2 py-1.5 text-sm border border-slate-600 rounded-md"
                 />
                 <button
                   onClick={addEdge}
@@ -768,13 +768,13 @@ export default function Bipartite() {
                   value={delEdgeFrom}
                   onChange={(e) => setDelEdgeFrom(e.target.value)}
                   placeholder="from"
-                  className="w-1/3 px-2 py-1.5 text-sm border border-slate-300 rounded-md"
+                  className="w-1/3 px-2 py-1.5 text-sm border border-slate-600 rounded-md"
                 />
                 <input
                   value={delEdgeTo}
                   onChange={(e) => setDelEdgeTo(e.target.value)}
                   placeholder="to"
-                  className="w-1/3 px-2 py-1.5 text-sm border border-slate-300 rounded-md"
+                  className="w-1/3 px-2 py-1.5 text-sm border border-slate-600 rounded-md"
                 />
                 <button
                   onClick={deleteEdge}
@@ -786,11 +786,11 @@ export default function Bipartite() {
             </div>
 
             {/* Generators */}
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-              <h2 className="font-semibold text-slate-800 mb-3">Generate</h2>
+            <div className="bg-slate-900 rounded-xl border border-slate-800 p-4">
+              <h2 className="font-semibold text-slate-100 mb-3">Generate</h2>
 
               <div className="mb-3">
-                <label className="block text-xs text-slate-600 mb-1">
+                <label className="block text-xs text-slate-400 mb-1">
                   Random graph
                 </label>
                 <div className="flex gap-2">
@@ -799,14 +799,14 @@ export default function Bipartite() {
                     value={randN}
                     onChange={(e) => setRandN(e.target.value)}
                     placeholder="n"
-                    className="w-16 px-2 py-1.5 text-sm border border-slate-300 rounded-md"
+                    className="w-16 px-2 py-1.5 text-sm border border-slate-600 rounded-md"
                   />
                   <input
                     type="number"
                     value={randE}
                     onChange={(e) => setRandE(e.target.value)}
                     placeholder="e"
-                    className="w-16 px-2 py-1.5 text-sm border border-slate-300 rounded-md"
+                    className="w-16 px-2 py-1.5 text-sm border border-slate-600 rounded-md"
                   />
                   <button
                     onClick={genRandom}
@@ -818,7 +818,7 @@ export default function Bipartite() {
               </div>
 
               <div className="mb-3">
-                <label className="block text-xs text-slate-600 mb-1">
+                <label className="block text-xs text-slate-400 mb-1">
                   Random bipartite K&#8322;,&#8322;
                 </label>
                 <div className="flex gap-2">
@@ -827,14 +827,14 @@ export default function Bipartite() {
                     value={biM}
                     onChange={(e) => setBiM(e.target.value)}
                     placeholder="m"
-                    className="w-16 px-2 py-1.5 text-sm border border-slate-300 rounded-md"
+                    className="w-16 px-2 py-1.5 text-sm border border-slate-600 rounded-md"
                   />
                   <input
                     type="number"
                     value={biN}
                     onChange={(e) => setBiN(e.target.value)}
                     placeholder="n"
-                    className="w-16 px-2 py-1.5 text-sm border border-slate-300 rounded-md"
+                    className="w-16 px-2 py-1.5 text-sm border border-slate-600 rounded-md"
                   />
                   <button
                     onClick={genBipartite}
@@ -846,7 +846,7 @@ export default function Bipartite() {
               </div>
 
               <div className="mb-3">
-                <label className="block text-xs text-slate-600 mb-1">
+                <label className="block text-xs text-slate-400 mb-1">
                   Odd cycle C&#8342;
                 </label>
                 <div className="flex gap-2">
@@ -855,7 +855,7 @@ export default function Bipartite() {
                     value={oddK}
                     onChange={(e) => setOddK(e.target.value)}
                     placeholder="k"
-                    className="w-16 px-2 py-1.5 text-sm border border-slate-300 rounded-md"
+                    className="w-16 px-2 py-1.5 text-sm border border-slate-600 rounded-md"
                   />
                   <button
                     onClick={genOddCycle}
@@ -882,10 +882,10 @@ export default function Bipartite() {
 
             {/* Applications */}
             <div className="bg-gradient-to-br from-blue-50 to-emerald-50 border border-blue-100 rounded-xl p-4">
-              <h3 className="font-semibold text-slate-800 mb-1">
+              <h3 className="font-semibold text-slate-100 mb-1">
                 Applications
               </h3>
-              <p className="text-xs text-slate-700 leading-relaxed">
+              <p className="text-xs text-slate-300 leading-relaxed">
                 Job assignment, stable matching prep, two-team scheduling, RNA
                 secondary structure, register allocation in 2-color interference
                 graphs.
@@ -911,11 +911,11 @@ export default function Bipartite() {
             )}
 
             {/* SVG */}
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-2 overflow-hidden">
+            <div className="bg-slate-900 rounded-xl border border-slate-800 p-2 overflow-hidden">
               <svg
                 ref={svgRef}
                 viewBox={`0 0 ${SVG_W} ${SVG_H}`}
-                className="w-full h-auto bg-slate-50 rounded-lg"
+                className="w-full h-auto bg-slate-800 rounded-lg"
                 style={{ userSelect: "none" }}
               >
                 {/* partition columns guide */}
@@ -1038,7 +1038,7 @@ export default function Bipartite() {
                   );
                 })}
               </svg>
-              <div className="flex items-center justify-between px-2 py-1 text-xs text-slate-500">
+              <div className="flex items-center justify-between px-2 py-1 text-xs text-slate-400">
                 <span>
                   Step {history ? stepIdx + 1 : 0} / {history?.steps.length || 0}
                 </span>
@@ -1049,20 +1049,20 @@ export default function Bipartite() {
             {/* Live state panel + pseudocode */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Live state */}
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-                <h3 className="font-semibold text-slate-800 mb-2">
+              <div className="bg-slate-900 rounded-xl border border-slate-800 p-4">
+                <h3 className="font-semibold text-slate-100 mb-2">
                   Live state
                 </h3>
                 <div className="text-sm space-y-2">
                   <div>
-                    <span className="text-slate-500">Queue (front→back): </span>
-                    <span className="font-mono text-slate-800">
+                    <span className="text-slate-400">Queue (front→back): </span>
+                    <span className="font-mono text-slate-100">
                       [{(cur?.queue || []).join(", ")}]
                     </span>
                   </div>
                   <div>
-                    <span className="text-slate-500">Visited: </span>
-                    <span className="font-mono text-slate-800">
+                    <span className="text-slate-400">Visited: </span>
+                    <span className="font-mono text-slate-100">
                       {"{" + (cur?.visited || []).join(", ") + "}"}
                     </span>
                   </div>
@@ -1072,10 +1072,10 @@ export default function Bipartite() {
                     </div>
                   )}
                   <div>
-                    <div className="text-slate-500 mb-1">Colors:</div>
-                    <div className="max-h-40 overflow-auto border border-slate-200 rounded-md">
+                    <div className="text-slate-400 mb-1">Colors:</div>
+                    <div className="max-h-40 overflow-auto border border-slate-700 rounded-md">
                       <table className="w-full text-xs">
-                        <thead className="bg-slate-100">
+                        <thead className="bg-slate-800">
                           <tr>
                             <th className="text-left px-2 py-1">Node</th>
                             <th className="text-left px-2 py-1">Color</th>

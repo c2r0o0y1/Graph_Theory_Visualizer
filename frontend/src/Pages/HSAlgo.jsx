@@ -710,55 +710,54 @@ export default function HSAlgo() {
         <div className="max-w-[1440px] mx-auto px-4 sm:px-6 py-6 space-y-5">
 
           {/* ── header ── */}
-          <header className="text-center space-y-1 animate-fade-in-up">
-            <h1 className="text-3xl sm:text-4xl font-extrabold gradient-text tracking-tight">
+          <header className="mb-2">
+            <h1 className="text-2xl font-bold text-slate-100">
               Hajnal–Szemerédi Equitable Coloring
             </h1>
-            <p className="text-slate-500 text-sm sm:text-base max-w-2xl mx-auto">
-              Step-by-step visualization of the Kierstead–Kostochka polynomial-time algorithm.
-              Every graph with {"Δ(G) \u2264 r"} admits an equitable (r+1)-coloring.
+            <p className="text-slate-400 text-sm mt-1">
+              Kierstead–Kostochka polynomial-time algorithm.
+              Every graph with &Delta;(G) &le; r admits an equitable (r+1)-coloring.
             </p>
           </header>
 
           {/* ── toast ── */}
           {toast && (
-            <div className="bg-white border border-slate-200 rounded-xl px-4 py-2.5 shadow-sm flex items-center gap-2 animate-slide-in-right">
-              <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse-slow" />
-              <span className="text-sm text-slate-700">{toast}</span>
+            <div className="border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-300">
+              {toast}
             </div>
           )}
 
           {/* ── stats ── */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 animate-fade-in-up">
-            {[
-              { label: 'Vertices n', value: nodes.length, color: 'from-blue-50 to-blue-100 text-blue-700' },
-              { label: 'Edges |E|', value: dispEdges.length, color: 'from-emerald-50 to-emerald-100 text-emerald-700' },
-              { label: '\u0394(G)', value: actualMaxDeg, color: actualMaxDeg > r ? 'from-red-50 to-red-100 text-red-600' : 'from-amber-50 to-amber-100 text-amber-700' },
-              { label: `r = ${r}, k = ${k}`, value: `${k} colors`, color: 'from-purple-50 to-purple-100 text-purple-700' },
-              { label: 'Status', value: conflictCount > 0 ? `${conflictCount} conflict${conflictCount > 1 ? 's' : ''}` : isEquitable && curStep === null ? 'Equitable' : curStep ? `Step ${hsIdx + 1}/${hsSteps.length}` : 'Proper', color: conflictCount > 0 ? 'from-red-50 to-red-100 text-red-600' : 'from-green-50 to-green-100 text-green-700' },
-            ].map((s, i) => (
-              <div key={i} className={`rounded-xl bg-gradient-to-br ${s.color} p-3 text-center border border-white/60`}>
-                <div className="text-[10px] font-semibold uppercase tracking-wider opacity-70">{s.label}</div>
-                <div className="text-lg font-bold mt-0.5">{s.value}</div>
-              </div>
-            ))}
+          <div className="flex flex-wrap items-center gap-4 text-xs text-slate-400">
+            <span>V = {nodes.length}</span>
+            <span>E = {dispEdges.length}</span>
+            <span className={actualMaxDeg > r ? 'text-red-400' : ''}>
+              &Delta; = {actualMaxDeg}
+            </span>
+            <span>r = {r}, k = {k} colors</span>
+            <span className={conflictCount > 0 ? 'text-red-400' : 'text-emerald-400'}>
+              {conflictCount > 0
+                ? `${conflictCount} conflict${conflictCount > 1 ? 's' : ''}`
+                : isEquitable && curStep === null ? 'Equitable'
+                : curStep ? `Step ${hsIdx + 1}/${hsSteps.length}`
+                : 'Proper'}
+            </span>
           </div>
 
           {/* ── algorithm controls ── */}
-          <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 space-y-4">
+          <section className="bg-slate-900 rounded-lg border border-slate-800 p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                <svg className="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+              <h2 className="text-sm font-semibold text-slate-300">
                 Algorithm (Kierstead–Kostochka, Theorem 3.2)
               </h2>
-              <div className="text-xs text-slate-400">
-                {hsSteps.length > 0 && `${hsSteps.length} steps computed`}
-              </div>
+              <span className="text-xs text-slate-400">
+                {hsSteps.length > 0 && `${hsSteps.length} steps`}
+              </span>
             </div>
 
             {/* presets */}
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Load&nbsp;preset:</span>
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Load&nbsp;preset:</span>
               {[
                 ['paper', 'Paper Graph (16v, 22e, \u0394=3)'],
                 ['petersen', 'Petersen (10v, \u0394=3)'],
@@ -766,7 +765,7 @@ export default function HSAlgo() {
                 ['k33', 'K\u2083,\u2083 (6v, \u0394=3)'],
               ].map(([id, label]) => (
                 <button key={id} onClick={() => loadPreset(id)}
-                  className="text-xs bg-slate-100 hover:bg-indigo-100 text-slate-700 hover:text-indigo-700 font-medium px-3 py-1.5 rounded-lg transition-colors">
+                  className="text-xs bg-slate-800 hover:bg-indigo-900/40 text-slate-300 hover:text-indigo-300 font-medium px-3 py-1.5 rounded-lg transition-colors">
                   {label}
                 </button>
               ))}
@@ -778,7 +777,7 @@ export default function HSAlgo() {
                 className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg shadow-sm transition-colors">
                 Compute Steps
               </button>
-              <div className="h-6 w-px bg-slate-200" />
+              <div className="h-6 w-px bg-slate-700" />
               {!hsPlaying ? (
                 <button onClick={hsRun} disabled={hsSteps.length === 0 || hsIdx + 1 >= hsSteps.length}
                   className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-sm font-semibold px-3 py-2 rounded-lg shadow-sm transition-colors disabled:cursor-not-allowed">
@@ -791,32 +790,32 @@ export default function HSAlgo() {
                 </button>
               )}
               <button onClick={hsBack} disabled={hsIdx <= -1 || hsPlaying}
-                className="bg-slate-200 hover:bg-slate-300 disabled:bg-slate-100 text-slate-700 disabled:text-slate-400 text-sm font-medium px-2.5 py-2 rounded-lg transition-colors disabled:cursor-not-allowed">
+                className="bg-slate-800 hover:bg-slate-700 disabled:bg-slate-900 text-slate-300 disabled:text-slate-500 text-sm font-medium px-2.5 py-2 rounded-lg transition-colors disabled:cursor-not-allowed">
                 &#9664;
               </button>
               <button onClick={hsForward} disabled={hsIdx + 1 >= hsSteps.length || hsPlaying}
-                className="bg-slate-200 hover:bg-slate-300 disabled:bg-slate-100 text-slate-700 disabled:text-slate-400 text-sm font-medium px-2.5 py-2 rounded-lg transition-colors disabled:cursor-not-allowed">
+                className="bg-slate-800 hover:bg-slate-700 disabled:bg-slate-900 text-slate-300 disabled:text-slate-500 text-sm font-medium px-2.5 py-2 rounded-lg transition-colors disabled:cursor-not-allowed">
                 &#9654;
               </button>
               <button onClick={hsJumpToEnd} disabled={hsSteps.length === 0 || hsPlaying}
-                className="bg-slate-200 hover:bg-slate-300 disabled:bg-slate-100 text-slate-700 disabled:text-slate-400 text-sm font-medium px-2.5 py-2 rounded-lg transition-colors disabled:cursor-not-allowed">
+                className="bg-slate-800 hover:bg-slate-700 disabled:bg-slate-900 text-slate-300 disabled:text-slate-500 text-sm font-medium px-2.5 py-2 rounded-lg transition-colors disabled:cursor-not-allowed">
                 &#9654;&#9654;
               </button>
               <button onClick={hsReset} disabled={hsSteps.length === 0}
-                className="bg-slate-200 hover:bg-slate-300 disabled:bg-slate-100 text-slate-700 disabled:text-slate-400 text-sm font-medium px-2.5 py-2 rounded-lg transition-colors disabled:cursor-not-allowed">
+                className="bg-slate-800 hover:bg-slate-700 disabled:bg-slate-900 text-slate-300 disabled:text-slate-500 text-sm font-medium px-2.5 py-2 rounded-lg transition-colors disabled:cursor-not-allowed">
                 &#8635; Reset
               </button>
               <div className="flex items-center gap-1.5 ml-auto">
-                <label className="text-xs text-slate-500">Speed</label>
+                <label className="text-xs text-slate-400">Speed</label>
                 <input type="range" min="200" max="3000" step="100" value={hsSpeed} onChange={(e) => setHsSpeed(Number(e.target.value))} className="w-24 accent-indigo-500" />
-                <span className="text-xs text-slate-500 w-12 text-right">{hsSpeed}ms</span>
+                <span className="text-xs text-slate-400 w-12 text-right">{hsSpeed}ms</span>
               </div>
             </div>
 
             {/* progress */}
             {hsSteps.length > 0 && (
               <div>
-                <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                <div className="w-full h-1.5 bg-slate-700 rounded-full overflow-hidden">
                   <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-300 ease-out"
                     style={{ width: `${Math.max(0, ((hsIdx + 1) / hsSteps.length) * 100)}%` }} />
                 </div>
@@ -825,9 +824,9 @@ export default function HSAlgo() {
 
             {/* step message */}
             {curStep && (
-              <div className="flex items-start gap-2 bg-slate-50 rounded-xl px-4 py-3 border border-slate-100">
+              <div className="flex items-start gap-2 bg-slate-800 rounded-xl px-4 py-3 border border-slate-700">
                 {stepBadge(curStep.type)}
-                <span className="text-sm text-slate-700 leading-relaxed">{curStep.message}</span>
+                <span className="text-sm text-slate-300 leading-relaxed">{curStep.message}</span>
               </div>
             )}
           </section>
@@ -836,19 +835,19 @@ export default function HSAlgo() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
             {/* ─ main graph ─ */}
-            <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 p-4 space-y-3">
+            <div className="lg:col-span-2 bg-slate-900 rounded-2xl border border-slate-800 p-4 space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold text-slate-700">Graph G</h3>
+                <h3 className="text-sm font-bold text-slate-300">Graph G</h3>
                 <div className="flex items-center gap-2">
                   <button onClick={() => { setConnectMode((m) => !m); setConnectSrc(null); }}
-                    className={`text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors ${connectMode ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                    className={`text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors ${connectMode ? 'bg-emerald-900/30 border-emerald-700 text-emerald-400' : 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700'}`}>
                     {connectMode ? 'Connect ON' : 'Connect Mode'}
                   </button>
                   <span className="text-[10px] text-slate-400">Zoom {zoom.toFixed(1)}x</span>
                 </div>
               </div>
 
-              <div className="relative overflow-hidden rounded-xl border border-slate-100 bg-gradient-to-br from-slate-50/80 to-stone-50/80">
+              <div className="relative overflow-hidden rounded-xl border border-slate-700 bg-slate-800">
                 <svg ref={svgRef} width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet"
                   className="block"
                   style={{ transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`, transformOrigin: 'center', transition: dragId || isPanning ? 'none' : 'transform 0.15s ease-out', cursor: connectMode ? 'crosshair' : isPanning ? 'grabbing' : 'grab' }}
@@ -913,8 +912,8 @@ export default function HSAlgo() {
             <div className="space-y-4">
 
               {/* color legend */}
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
-                <h3 className="text-sm font-bold text-slate-700 mb-3">Color Classes (mod-{k})</h3>
+              <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4">
+                <h3 className="text-sm font-bold text-slate-300 mb-3">Color Classes (mod-{k})</h3>
                 <div className="space-y-1.5">
                   {pal.map((c, i) => {
                     const cnt = curStep
@@ -923,30 +922,30 @@ export default function HSAlgo() {
                     return (
                       <div key={i} className="flex items-center gap-2">
                         <span className="w-4 h-4 rounded-full border border-black/10 shrink-0" style={{ background: c }} />
-                        <span className="text-xs text-slate-600">
+                        <span className="text-xs text-slate-400">
                           <b>Class {i}</b>{CLASS_NAMES[i] ? ` (${CLASS_NAMES[i]})` : ''}: <b>{cnt}</b> vertices
                         </span>
                       </div>
                     );
                   })}
                 </div>
-                <div className="mt-3 pt-2 border-t border-slate-100 text-[11px] text-slate-500">
+                <div className="mt-3 pt-2 border-t border-slate-700 text-[11px] text-slate-400">
                   Equitable target: each class has {nodes.length > 0 ? <b>{Math.floor(nodes.length / k)}</b> : '?'}
                   {nodes.length % k > 0 && <> or <b>{Math.floor(nodes.length / k) + 1}</b></>} vertices.
                 </div>
                 <div className="mt-2 flex flex-wrap gap-1.5">
-                  <button onClick={applyModColoring} className="text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 py-1 rounded transition-colors">
+                  <button onClick={applyModColoring} className="text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded transition-colors">
                     Reset to mod-{k}
                   </button>
-                  <button onClick={applyGreedyColoring} className="text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 py-1 rounded transition-colors">
+                  <button onClick={applyGreedyColoring} className="text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded transition-colors">
                     Greedy proper
                   </button>
                 </div>
               </div>
 
               {/* auxiliary digraph H(G,f) */}
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
-                <h3 className="text-sm font-bold text-slate-700 mb-1">Auxiliary Digraph H(G,&thinsp;f)</h3>
+              <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4">
+                <h3 className="text-sm font-bold text-slate-300 mb-1">Auxiliary Digraph H(G,&thinsp;f)</h3>
                 <p className="text-[10px] text-slate-400 mb-2">
                   Arc V&rarr;W means some vertex in V has no neighbor in W (movable).
                 </p>
@@ -1025,13 +1024,13 @@ export default function HSAlgo() {
               </div>
 
               {/* max degree control */}
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
-                <h3 className="text-sm font-bold text-slate-700 mb-2">Parameters</h3>
-                <label className="flex items-center gap-2 text-xs text-slate-600">
+              <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4">
+                <h3 className="text-sm font-bold text-slate-300 mb-2">Parameters</h3>
+                <label className="flex items-center gap-2 text-xs text-slate-400">
                   Max degree r =
                   <input type="number" min={1} max={20} value={maxDeg}
                     onChange={(e) => setMaxDeg(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                    className="w-14 px-2 py-1 border border-slate-200 rounded-lg text-center text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400" />
+                    className="w-14 px-2 py-1 border border-slate-600 rounded-lg bg-slate-800 text-slate-200 text-center text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400" />
                   <span className="text-slate-400">&rarr; k = {k} colors</span>
                 </label>
               </div>
@@ -1039,9 +1038,9 @@ export default function HSAlgo() {
           </div>
 
           {/* ── graph builder ── */}
-          <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <section className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
             <button onClick={() => setBuilderOpen((o) => !o)}
-              className="w-full flex items-center justify-between px-5 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors">
+              className="w-full flex items-center justify-between px-5 py-3 text-sm font-bold text-slate-300 hover:bg-slate-800 transition-colors">
               <span className="flex items-center gap-2">
                 <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
                 Graph Builder
@@ -1050,14 +1049,14 @@ export default function HSAlgo() {
             </button>
 
             {builderOpen && (
-              <div className="px-5 pb-5 grid grid-cols-1 md:grid-cols-3 gap-5 border-t border-slate-100 pt-4">
+              <div className="px-5 pb-5 grid grid-cols-1 md:grid-cols-3 gap-5 border-t border-slate-700 pt-4">
                 {/* nodes */}
                 <div className="space-y-3">
-                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Vertices</h4>
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Vertices</h4>
                   <div className="flex gap-2">
                     <input type="number" placeholder="Count" value={nodeCount} onChange={(e) => setNodeCount(e.target.value)} min={1} max={100}
                       onKeyDown={(e) => { if (e.key === 'Enter') addBulkNodes(); }}
-                      className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-300" />
+                      className="flex-1 px-3 py-2 text-sm border border-slate-600 rounded-lg bg-slate-800 text-slate-200 focus:ring-2 focus:ring-indigo-300" />
                     <button onClick={addBulkNodes}
                       className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors shadow-sm">
                       Add
@@ -1065,17 +1064,17 @@ export default function HSAlgo() {
                   </div>
                   <p className="text-[10px] text-slate-400">Or double-click the canvas to place a vertex.</p>
                   <button onClick={clearAll}
-                    className="w-full text-xs bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 py-2 rounded-lg transition-colors">
+                    className="w-full text-xs bg-slate-800 hover:bg-red-900/30 text-slate-400 hover:text-red-400 py-2 rounded-lg transition-colors">
                     Clear Everything
                   </button>
                 </div>
 
                 {/* edges */}
                 <div className="space-y-3">
-                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Edges</h4>
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Edges</h4>
                   <div className="space-y-1">
                     <textarea value={bulkText} onChange={(e) => setBulkText(e.target.value)} rows={3} placeholder="0-1, 1-2, 2-3, ..."
-                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-300 font-mono" />
+                      className="w-full px-3 py-2 text-sm border border-slate-600 rounded-lg bg-slate-800 text-slate-200 focus:ring-2 focus:ring-indigo-300 font-mono" />
                     <button onClick={applyBulkEdges}
                       className="w-full bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium py-2 rounded-lg transition-colors shadow-sm">
                       Apply Edges
@@ -1089,8 +1088,8 @@ export default function HSAlgo() {
 
                 {/* info */}
                 <div className="space-y-3">
-                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Quick Reference</h4>
-                  <div className="text-xs text-slate-500 space-y-1.5 leading-relaxed">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Quick Reference</h4>
+                  <div className="text-xs text-slate-400 space-y-1.5 leading-relaxed">
                     <p><b>Hajnal–Szemerédi Theorem:</b> Every graph with &Delta;(G)&nbsp;&le;&nbsp;r has an equitable (r+1)-coloring.</p>
                     <p><b>Equitable:</b> class sizes differ by at most 1.</p>
                     <p><b>Mod coloring:</b> vertex v &rarr; class (v&nbsp;mod&nbsp;k). For k=4: {'{'}0,4,8,12{'}'} are Red, {'{'}1,5,9,13{'}'} Blue, etc.</p>

@@ -225,7 +225,7 @@ const BFSNode = memo(({
 export default function BFS() {
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
-  const [scrollProgress, setScrollProgress] = useState(0);
+  // scrollProgress removed — decorative only
   
   // Input states for dropdown operations
   const [showNodeInput, setShowNodeInput] = useState('');
@@ -765,19 +765,7 @@ export default function BFS() {
   }, [isPlayingAnimation, isAnimating, currentBfsStep, bfsSteps, animationSpeed]);
 
 
-  // Scroll progress tracking
-  useEffect(() => {
-    const handleScroll = () => {
-      const windowHeight = window.innerHeight;
-      const documentHeight = document.documentElement.scrollHeight - windowHeight;
-      const scrollTop = window.scrollY;
-      const progress = (scrollTop / documentHeight) * 100;
-      setScrollProgress(Math.min(progress, 100));
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  // scroll progress tracking removed — decorative only
 
   const clearGraph = () => {
     setNodes([]);
@@ -1193,148 +1181,61 @@ export default function BFS() {
   return (
     <>
 
-      {/* Scroll Progress Bar */}
-      <div className="fixed top-0 left-0 w-full h-1 bg-slate-200 z-50">
-        <div 
-          className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-green-500 transition-all duration-150 ease-out"
-          style={{ width: `${scrollProgress}%` }}
-        />
-      </div>
-      
-      <div className="algo-dark min-h-screen custom-scrollbar overflow-y-auto scroll-smooth">
-        <div className="container mx-auto px-4 py-8 custom-scrollbar">
-          
-          {/* Navigation Progress Indicator */}
-          <div className="fixed top-20 right-4 z-10 bg-white/80 backdrop-blur-sm rounded-lg shadow-lg border border-slate-200 p-2">
-            <div className="flex flex-col gap-2">
-              <div 
-                className="w-2 h-2 rounded-full bg-blue-500 cursor-pointer hover:bg-blue-600 transition-colors" 
-                title="Graph Header"
-                onClick={() => document.querySelector('.graph-header')?.scrollIntoView({ behavior: 'smooth' })}
-              />
-              <div 
-                className="w-2 h-2 rounded-full bg-yellow-500 cursor-pointer hover:bg-yellow-600 transition-colors" 
-                title="Controls"
-                onClick={() => document.querySelector('.controls-section')?.scrollIntoView({ behavior: 'smooth' })}
-              />
-              <div 
-                className="w-2 h-2 rounded-full bg-green-500 cursor-pointer hover:bg-green-600 transition-colors" 
-                title="Visualization"
-                onClick={() => document.querySelector('.visualization-section')?.scrollIntoView({ behavior: 'smooth' })}
-              />
-              {isAnimating && (
-                <div 
-                  className="w-2 h-2 rounded-full bg-purple-500 cursor-pointer hover:bg-purple-600 transition-colors" 
-                  title="Algorithm Steps"
-                  onClick={() => document.querySelector('.steps-section')?.scrollIntoView({ behavior: 'smooth' })}
-                />
-              )}
-            </div>
+      <div className="algo-dark min-h-screen">
+        <div className="container mx-auto px-4 py-6">
+
+        {/* Header */}
+        <header className="mb-4">
+          <h1 className="text-2xl font-bold text-slate-100">Breadth-First Search (BFS)</h1>
+          <p className="text-slate-400 text-sm mt-1">Shortest-path traversal with step-by-step animation</p>
+          <div className="flex flex-wrap items-center gap-4 mt-3 text-xs text-slate-400">
+            <span>V = {graphProps.nodeCount}</span>
+            <span>E = {graphProps.edgeCount}</span>
+            <span>Components = {graphProps.connectedComponents}</span>
+            <span>&Delta; = {graphProps.maxCurrentDegree}</span>
+            <span>Avg deg = {graphProps.averageDegree}</span>
           </div>
-        {/* Mathematical Header */}
-        <div className="text-center mb-8 graph-header animate-fade-in-up">
-          <div className="mb-4">
-            <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-blue-800 bg-clip-text text-transparent mb-2">
-              Graph Theory Visualizer
-            </h1>
-            <p className="text-slate-600 text-xl font-medium animate-slide-in-right">Interactive BFS Algorithm Explorer</p>
-            <p className="text-slate-500 text-sm mt-2">Visualize shortest path finding with step-by-step animation</p>
-          </div>
-          <div className="mt-6 p-6 bg-white rounded-xl shadow-lg border border-slate-200 backdrop-blur-sm bg-white/80 animate-fade-in-up">
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-6 text-sm">
-              <div className="text-center group">
-                <div className="p-3 rounded-lg bg-gradient-to-br from-blue-50 to-blue-100 group-hover:from-blue-100 group-hover:to-blue-200 transition-all duration-200">
-                  <span className="block font-medium text-slate-700 mb-1">Nodes</span>
-                  <div className="text-3xl font-bold text-blue-600">{graphProps.nodeCount}</div>
-                </div>
-              </div>
-              <div className="text-center group">
-                <div className="p-3 rounded-lg bg-gradient-to-br from-green-50 to-green-100 group-hover:from-green-100 group-hover:to-green-200 transition-all duration-200">
-                  <span className="block font-medium text-slate-700 mb-1">Edges</span>
-                  <div className="text-3xl font-bold text-green-600">{graphProps.edgeCount}</div>
-                </div>
-              </div>
-              <div className="text-center group">
-                <div className="p-3 rounded-lg bg-gradient-to-br from-purple-50 to-purple-100 group-hover:from-purple-100 group-hover:to-purple-200 transition-all duration-200">
-                  <span className="block font-medium text-slate-700 mb-1">Components</span>
-                  <div className="text-3xl font-bold text-purple-600">{graphProps.connectedComponents}</div>
-                </div>
-              </div>
-              <div className="text-center group">
-                <div className="p-3 rounded-lg bg-gradient-to-br from-red-50 to-red-100 group-hover:from-red-100 group-hover:to-red-200 transition-all duration-200">
-                  <span className="block font-medium text-slate-700 mb-1">Max Degree</span>
-                  <div className="text-3xl font-bold text-red-600">{graphProps.maxCurrentDegree}</div>
-                </div>
-              </div>
-              <div className="text-center group col-span-2 md:col-span-1">
-                <div className="p-3 rounded-lg bg-gradient-to-br from-orange-50 to-orange-100 group-hover:from-orange-100 group-hover:to-orange-200 transition-all duration-200">
-                  <span className="block font-medium text-slate-700 mb-1">Avg Degree</span>
-                  <div className="text-3xl font-bold text-orange-600">{graphProps.averageDegree}</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        </header>
 
         {/* Algorithm Information */}
         {algorithmInfo && (
-          <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 shadow-sm animate-slide-in-right">
-            <div className="flex items-center">
-              <div className="w-3 h-3 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full mr-3 animate-pulse-slow shadow-sm"></div>
-              <span className="text-blue-800 font-medium text-sm">{algorithmInfo}</span>
-            </div>
+          <div className="mb-4 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-300">
+            {algorithmInfo}
           </div>
         )}
 
-        {/* Maximum Degree Constraint */}
-        <div className="bg-gradient-to-r from-yellow-50 to-amber-50 rounded-xl shadow-lg p-6 mb-6 border border-yellow-200">
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="flex items-center gap-2">
-              <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-              <h3 className="text-lg font-semibold text-slate-800">Maximum Degree Constraint</h3>
-            </div>
-            <div className="flex items-center gap-3">
-              <label className="flex items-center">
-                <input 
-                  type="checkbox" 
-                  checked={enforceMaxDegree}
-                  onChange={(e) => setEnforceMaxDegree(e.target.checked)}
-                  className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                />
-                <span className="text-sm font-medium text-slate-700">Enforce Max Degree</span>
-              </label>
-              <input 
-                type="number"
-                placeholder="Max degree"
-                value={maxDegree}
-                onChange={(e) => setMaxDegree(e.target.value)}
-                min="1"
-                disabled={!enforceMaxDegree}
-                className="px-3 py-1 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 disabled:bg-gray-100 disabled:text-gray-400"
-              />
-              {enforceMaxDegree && maxDegree && (
-                <span className="text-sm text-slate-600 bg-yellow-100 px-2 py-1 rounded">
-                  Max degree: {maxDegree} (for graph coloring: {parseInt(maxDegree) + 1} colors needed)
-                </span>
-              )}
-            </div>
-          </div>
+        {/* Max Degree Constraint — compact row */}
+        <div className="flex flex-wrap items-center gap-3 mb-4 text-sm">
+          <label className="flex items-center gap-2 text-slate-300">
+            <input
+              type="checkbox"
+              checked={enforceMaxDegree}
+              onChange={(e) => setEnforceMaxDegree(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-600"
+            />
+            Max &Delta;
+          </label>
+          <input
+            type="number"
+            placeholder="k"
+            value={maxDegree}
+            onChange={(e) => setMaxDegree(e.target.value)}
+            min="1"
+            disabled={!enforceMaxDegree}
+            className="w-16 px-2 py-1 border border-slate-600 rounded bg-slate-800 text-slate-200 text-sm disabled:opacity-40"
+          />
+          {enforceMaxDegree && maxDegree && (
+            <span className="text-slate-500">({parseInt(maxDegree) + 1} colors needed)</span>
+          )}
         </div>
 
         {/* Control Panel */}
-         <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-xl p-8 mb-8 border border-slate-200 controls-section">
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-            
+        <div className="bg-slate-900 rounded-lg border border-slate-800 p-4 mb-6">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+
             {/* Node Operations */}
-            <div className="space-y-6">
-              <div className="flex items-center gap-2 pb-3 border-b-2 border-blue-200">
-                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                </svg>
-                <h3 className="text-lg font-bold text-slate-800">Node Operations</h3>
-              </div>
+            <div>
+              <h3 className="text-sm font-semibold text-slate-300 mb-2">Nodes</h3>
               
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Node Actions</label>
@@ -1350,7 +1251,7 @@ export default function BFS() {
                       setTempInputs(prev => ({ ...prev, bulkCount: '', deleteNodeId: '' }));
                     }
                   }}
-                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-medium text-slate-700 shadow-sm hover:border-slate-400 transition-colors cursor-pointer"
+                  className="w-full px-3 py-2.5 border border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-slate-800 font-medium text-slate-200 hover:border-slate-500 transition-colors cursor-pointer"
                 >
                   <option value="">Select Node Operation...</option>
                   <option value="add-single">Add Single Node</option>
@@ -1495,13 +1396,8 @@ export default function BFS() {
             </div>
 
             {/* Edge Operations */}
-            <div className="space-y-6">
-              <div className="flex items-center gap-2 pb-3 border-b-2 border-green-200">
-                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                </svg>
-                <h3 className="text-lg font-bold text-slate-800">Edge Operations</h3>
-              </div>
+            <div>
+              <h3 className="text-sm font-semibold text-slate-300 mb-2">Edges</h3>
               
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Edge Actions</label>
@@ -1517,7 +1413,7 @@ export default function BFS() {
                       randomEdgeCount: '' 
                     }));
                   }}
-                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white font-medium text-slate-700 shadow-sm hover:border-slate-400 transition-colors cursor-pointer"
+                  className="w-full px-3 py-2.5 border border-slate-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-slate-800 font-medium text-slate-200 hover:border-slate-500 transition-colors cursor-pointer"
                 >
                   <option value="">Select Edge Operation...</option>
                   <option value="add">Add Edge</option>
@@ -1767,7 +1663,7 @@ export default function BFS() {
                     else if (template === 'star') createStarGraph();
                     e.target.value = '';
                   }}
-                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white font-medium text-slate-700 shadow-sm hover:border-slate-400 transition-colors cursor-pointer"
+                  className="w-full px-3 py-2.5 border border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-slate-800 font-medium text-slate-200 hover:border-slate-500 transition-colors cursor-pointer"
                 >
                   <option value="" className="text-slate-500">Select Graph Template...</option>
                   <option value="example">Example Graph</option>
@@ -1779,13 +1675,8 @@ export default function BFS() {
             </div>
 
             {/* Path Operations */}
-            <div className="space-y-6">
-              <div className="flex items-center gap-2 pb-3 border-b-2 border-purple-200">
-                <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                </svg>
-                <h3 className="text-lg font-bold text-slate-800">Path Finding</h3>
-              </div>
+            <div>
+              <h3 className="text-sm font-semibold text-slate-300 mb-2">Path Finding</h3>
               
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Path Actions</label>
@@ -1800,7 +1691,7 @@ export default function BFS() {
                       clearGraph();
                     }
                   }}
-                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white font-medium text-slate-700 shadow-sm hover:border-slate-400 transition-colors cursor-pointer"
+                  className="w-full px-3 py-2.5 border border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-slate-800 font-medium text-slate-200 hover:border-slate-500 transition-colors cursor-pointer"
                 >
                   <option value="">Select Path Operation...</option>
                   <option value="find-path">Find Shortest Path</option>
@@ -1895,13 +1786,8 @@ export default function BFS() {
             </div>
 
             {/* Mathematical Controls */}
-            <div className="space-y-6">
-              <div className="flex items-center gap-2 pb-3 border-b-2 border-indigo-200">
-                <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                </svg>
-                <h3 className="text-lg font-bold text-slate-800">Mathematical Tools</h3>
-              </div>
+            <div>
+              <h3 className="text-sm font-semibold text-slate-300 mb-2">Tools</h3>
               
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">History Actions</label>
@@ -1912,7 +1798,7 @@ export default function BFS() {
                     else if (action === 'redo' && currentStep < history.length) redo();
                     e.target.value = '';
                   }}
-                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-medium text-slate-700 shadow-sm hover:border-slate-400 transition-colors cursor-pointer"
+                  className="w-full px-3 py-2.5 border border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-slate-800 font-medium text-slate-200 hover:border-slate-500 transition-colors cursor-pointer"
                 >
                   <option value="" className="text-slate-500">Select History Action...</option>
                   <option value="undo" disabled={currentStep === 0}>Undo {currentStep > 0 ? `(${currentStep} available)` : '(none)'}</option>
@@ -2004,7 +1890,7 @@ export default function BFS() {
                     else if (option === 'degrees') setShowDegrees(!showDegrees);
                     e.target.value = '';
                   }}
-                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white font-medium text-slate-700 shadow-sm hover:border-slate-400 transition-colors cursor-pointer"
+                  className="w-full px-3 py-2.5 border border-slate-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-slate-800 font-medium text-slate-200 hover:border-slate-500 transition-colors cursor-pointer"
                 >
                   <option value="" className="text-slate-500">Toggle Display Options...</option>
                   <option value="coordinates">Coordinates {showCoordinates ? '(ON)' : '(OFF)'}</option>
@@ -2017,7 +1903,7 @@ export default function BFS() {
         </div>
 
         {/* Graph Stats */}
-        <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg p-6 mb-8 border border-slate-200">
+        <div className="bg-slate-900 rounded-xl border border-slate-800 p-6 mb-8">
           <div className="flex flex-wrap gap-8 text-sm text-slate-600">
             <div className="flex items-center gap-2">
               <span className="font-semibold">Nodes:</span>
@@ -2030,7 +1916,7 @@ export default function BFS() {
             {nodes.length > 0 && (
               <div className="flex items-center gap-2">
                 <span className="font-semibold">Node IDs:</span>
-                <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded">{nodes.map(n => n.id).sort((a, b) => a - b).join(', ')}</span>
+                <span className="bg-slate-700 text-slate-200 px-2 py-1 rounded">{nodes.map(n => n.id).sort((a, b) => a - b).join(', ')}</span>
               </div>
             )}
             {enforceMaxDegree && maxDegree && (
@@ -2045,7 +1931,7 @@ export default function BFS() {
                  {/* Split-Screen Graph Visualization */}
          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 visualization-section">
            {/* Main Graph */}
-        <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-xl p-8 border border-slate-200">
+        <div className="bg-slate-900 rounded-xl border border-slate-800 p-8">
                       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
                <h3 className="text-lg font-semibold text-slate-800">Main Graph</h3>
               <div className="flex items-center gap-4">
@@ -2153,7 +2039,7 @@ export default function BFS() {
            </div>
 
            {/* BFS Algorithm Visualization */}
-           <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-xl p-8 border border-slate-200">
+           <div className="bg-slate-900 rounded-xl border border-slate-800 p-8">
              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
                <h3 className="text-lg font-semibold text-slate-800">BFS Algorithm State</h3>
                <div className="text-sm text-slate-500">
@@ -2169,13 +2055,13 @@ export default function BFS() {
                    <div className="grid grid-cols-2 gap-4 text-xs">
                      <div>
                        <span className="font-medium text-slate-700">Queue:</span>
-                       <div className="bg-white p-2 rounded border">
+                       <div className="bg-slate-800 p-2 rounded border border-slate-700">
                          {bfsQueue.length > 0 ? `[${bfsQueue.join(', ')}]` : 'Empty'}
                        </div>
                      </div>
                      <div>
                        <span className="font-medium text-slate-700">Visited:</span>
-                       <div className="bg-white p-2 rounded border">
+                       <div className="bg-slate-800 p-2 rounded border border-slate-700">
                          {visitedNodes.size > 0 ? `{${Array.from(visitedNodes).join(', ')}}` : 'None'}
                        </div>
                      </div>
@@ -2282,7 +2168,7 @@ export default function BFS() {
 
          {/* BFS Algorithm Steps */}
          {isAnimating && bfsSteps.length > 0 && (
-           <div className="mt-8 bg-white/90 backdrop-blur-sm rounded-xl shadow-xl p-8 border border-slate-200 steps-section">
+           <div className="mt-8 bg-slate-900 rounded-xl border border-slate-800 p-8 steps-section">
              <h4 className="font-semibold text-slate-800 mb-4">BFS Algorithm Steps</h4>
              <div className="max-h-64 overflow-y-auto space-y-2 thin-scrollbar">
                {bfsSteps.map((step, index) => (
@@ -2293,7 +2179,7 @@ export default function BFS() {
                        ? 'bg-blue-100 border-blue-300 text-blue-800' 
                        : index < currentBfsStep
                        ? 'bg-green-50 border-green-200 text-green-800'
-                       : 'bg-gray-50 border-gray-200 text-gray-600'
+                       : 'bg-slate-800 border-slate-700 text-slate-400'
                    }`}
                    onClick={() => goToStep(index)}
                  >

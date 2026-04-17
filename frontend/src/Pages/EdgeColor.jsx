@@ -197,7 +197,7 @@ function genPetersen() {
 
 const Pseudocode = memo(function Pseudocode({ activeLine }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-900 text-slate-100 p-4 text-xs font-mono shadow-sm">
+    <div className="rounded-xl border border-slate-700 bg-slate-900 text-slate-100 p-4 text-xs font-mono shadow-sm">
       <div className="text-teal-300 mb-2 text-[11px] uppercase tracking-wider">
         Pseudocode
       </div>
@@ -210,7 +210,7 @@ const Pseudocode = memo(function Pseudocode({ activeLine }) {
               : ""
           }`}
         >
-          <span className="text-slate-500 mr-2">{String(i + 1).padStart(2, " ")}</span>
+          <span className="text-slate-400 mr-2">{String(i + 1).padStart(2, " ")}</span>
           {line}
         </div>
       ))}
@@ -224,20 +224,20 @@ const Legend = memo(function Legend({ counts }) {
   );
   if (entries.length === 0)
     return (
-      <div className="text-xs text-slate-500 italic">No colors used yet.</div>
+      <div className="text-xs text-slate-400 italic">No colors used yet.</div>
     );
   return (
     <div className="flex flex-wrap gap-2">
       {entries.map(([c, count]) => (
         <div
           key={c}
-          className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-full px-2.5 py-1 text-xs shadow-sm"
+          className="flex items-center gap-1.5 bg-slate-800 border border-slate-600 rounded-full px-2.5 py-1 text-xs shadow-sm"
         >
           <span
             className="inline-block w-3 h-3 rounded-full"
             style={{ background: PALETTE[Number(c) % PALETTE.length] }}
           />
-          <span className="font-medium text-slate-700">c{c}</span>
+          <span className="font-medium text-slate-300">c{c}</span>
           <span className="text-slate-400">×{count}</span>
         </div>
       ))}
@@ -629,14 +629,13 @@ export default function EdgeColor() {
     <div className="algo-dark min-h-screen py-8">
       <div className="container mx-auto px-4 max-w-7xl">
         {/* Header */}
-        <header className="mb-6">
-          <h1 className="text-3xl md:text-4xl font-bold text-slate-800 tracking-tight">
+        <header className="mb-4">
+          <h1 className="text-2xl font-bold text-slate-100">
             Edge Coloring — Vizing's Theorem
           </h1>
-          <p className="text-slate-600 mt-2 max-w-3xl">
+          <p className="text-slate-400 text-sm mt-1 max-w-3xl">
             Assign colors to edges so no two edges sharing a vertex get the same
-            color. Vizing says you need only Δ or Δ+1 colors. Which one? That's
-            the Class 1 / Class 2 dichotomy.
+            color. Vizing says you need only &Delta; or &Delta;+1 colors.
           </p>
         </header>
 
@@ -644,15 +643,15 @@ export default function EdgeColor() {
           {/* Controls */}
           <aside className="lg:col-span-1 space-y-4">
             {/* Editing */}
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-              <h2 className="text-sm font-semibold text-slate-700 mb-3 uppercase tracking-wider">
+            <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
+              <h2 className="text-sm font-semibold text-slate-300 mb-3 uppercase tracking-wider">
                 Graph editing
               </h2>
 
               <div className="space-y-2">
                 <div className="flex gap-2">
                   <input
-                    className="flex-1 border border-slate-300 rounded px-2 py-1 text-sm"
+                    className="flex-1 border border-slate-600 rounded px-2 py-1 text-sm"
                     placeholder="Node ID (e.g. 7)"
                     value={newNodeId}
                     onChange={(e) => setNewNodeId(e.target.value)}
@@ -666,7 +665,7 @@ export default function EdgeColor() {
                 </div>
                 <div className="flex gap-2">
                   <input
-                    className="flex-1 border border-slate-300 rounded px-2 py-1 text-sm"
+                    className="flex-1 border border-slate-600 rounded px-2 py-1 text-sm"
                     placeholder="Bulk add count"
                     value={bulkN}
                     onChange={(e) => setBulkN(e.target.value)}
@@ -681,13 +680,13 @@ export default function EdgeColor() {
 
                 <div className="flex gap-2">
                   <input
-                    className="w-16 border border-slate-300 rounded px-2 py-1 text-sm"
+                    className="w-16 border border-slate-600 rounded px-2 py-1 text-sm"
                     placeholder="u"
                     value={edgeU}
                     onChange={(e) => setEdgeU(e.target.value)}
                   />
                   <input
-                    className="w-16 border border-slate-300 rounded px-2 py-1 text-sm"
+                    className="w-16 border border-slate-600 rounded px-2 py-1 text-sm"
                     placeholder="v"
                     value={edgeV}
                     onChange={(e) => setEdgeV(e.target.value)}
@@ -702,13 +701,13 @@ export default function EdgeColor() {
 
                 <div className="flex gap-2">
                   <input
-                    className="w-16 border border-slate-300 rounded px-2 py-1 text-sm"
+                    className="w-16 border border-slate-600 rounded px-2 py-1 text-sm"
                     placeholder="u"
                     value={delEdgeU}
                     onChange={(e) => setDelEdgeU(e.target.value)}
                   />
                   <input
-                    className="w-16 border border-slate-300 rounded px-2 py-1 text-sm"
+                    className="w-16 border border-slate-600 rounded px-2 py-1 text-sm"
                     placeholder="v"
                     value={delEdgeV}
                     onChange={(e) => setDelEdgeV(e.target.value)}
@@ -723,7 +722,7 @@ export default function EdgeColor() {
 
                 <div className="flex gap-2">
                   <input
-                    className="flex-1 border border-slate-300 rounded px-2 py-1 text-sm"
+                    className="flex-1 border border-slate-600 rounded px-2 py-1 text-sm"
                     placeholder="Node ID to delete"
                     value={delNodeId}
                     onChange={(e) => setDelNodeId(e.target.value)}
@@ -738,7 +737,7 @@ export default function EdgeColor() {
 
                 <button
                   onClick={clearAll}
-                  className="w-full bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm px-3 py-1 rounded"
+                  className="w-full bg-slate-200 hover:bg-slate-300 text-slate-300 text-sm px-3 py-1 rounded"
                 >
                   Clear All
                 </button>
@@ -746,8 +745,8 @@ export default function EdgeColor() {
             </div>
 
             {/* Generators */}
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-              <h2 className="text-sm font-semibold text-slate-700 mb-3 uppercase tracking-wider">
+            <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
+              <h2 className="text-sm font-semibold text-slate-300 mb-3 uppercase tracking-wider">
                 Generators
               </h2>
               <div className="space-y-2">
@@ -758,9 +757,9 @@ export default function EdgeColor() {
                   Random graph
                 </button>
                 <div className="flex gap-2 items-center">
-                  <label className="text-xs text-slate-600">K_n n=</label>
+                  <label className="text-xs text-slate-400">K_n n=</label>
                   <input
-                    className="w-14 border border-slate-300 rounded px-2 py-1 text-sm"
+                    className="w-14 border border-slate-600 rounded px-2 py-1 text-sm"
                     value={knN}
                     onChange={(e) => setKnN(e.target.value)}
                   />
@@ -772,14 +771,14 @@ export default function EdgeColor() {
                   </button>
                 </div>
                 <div className="flex gap-2 items-center">
-                  <label className="text-xs text-slate-600">K_{`{m,n}`}</label>
+                  <label className="text-xs text-slate-400">K_{`{m,n}`}</label>
                   <input
-                    className="w-12 border border-slate-300 rounded px-2 py-1 text-sm"
+                    className="w-12 border border-slate-600 rounded px-2 py-1 text-sm"
                     value={kmnM}
                     onChange={(e) => setKmnM(e.target.value)}
                   />
                   <input
-                    className="w-12 border border-slate-300 rounded px-2 py-1 text-sm"
+                    className="w-12 border border-slate-600 rounded px-2 py-1 text-sm"
                     value={kmnN}
                     onChange={(e) => setKmnN(e.target.value)}
                   />
@@ -800,16 +799,16 @@ export default function EdgeColor() {
             </div>
 
             {/* Algorithm controls */}
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-              <h2 className="text-sm font-semibold text-slate-700 mb-3 uppercase tracking-wider">
+            <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
+              <h2 className="text-sm font-semibold text-slate-300 mb-3 uppercase tracking-wider">
                 Algorithm
               </h2>
 
-              <label className="block text-xs text-slate-600 mb-1">
+              <label className="block text-xs text-slate-400 mb-1">
                 Edge order
               </label>
               <select
-                className="w-full border border-slate-300 rounded px-2 py-1 text-sm mb-3"
+                className="w-full border border-slate-600 rounded px-2 py-1 text-sm mb-3"
                 value={order}
                 onChange={(e) => setOrder(e.target.value)}
               >
@@ -823,7 +822,7 @@ export default function EdgeColor() {
               <div className="grid grid-cols-4 gap-2 mb-3">
                 <button
                   onClick={handleStepBack}
-                  className="bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm px-2 py-1.5 rounded"
+                  className="bg-slate-200 hover:bg-slate-300 text-slate-300 text-sm px-2 py-1.5 rounded"
                   disabled={stepIdx < 0}
                 >◀</button>
                 {!running ? (
@@ -839,7 +838,7 @@ export default function EdgeColor() {
                 )}
                 <button
                   onClick={handleStepFwd}
-                  className="bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm px-2 py-1.5 rounded"
+                  className="bg-slate-200 hover:bg-slate-300 text-slate-300 text-sm px-2 py-1.5 rounded"
                   disabled={stepIdx >= history.length - 1}
                 >▶</button>
                 <button
@@ -848,7 +847,7 @@ export default function EdgeColor() {
                 >⟲ Reset</button>
               </div>
 
-              <label className="block text-xs text-slate-600 mb-1">
+              <label className="block text-xs text-slate-400 mb-1">
                 Speed: {speed} ms/step
               </label>
               <input
@@ -863,14 +862,14 @@ export default function EdgeColor() {
             </div>
 
             {/* Stats */}
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-              <h2 className="text-sm font-semibold text-slate-700 mb-3 uppercase tracking-wider">
+            <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
+              <h2 className="text-sm font-semibold text-slate-300 mb-3 uppercase tracking-wider">
                 Live stats
               </h2>
               <div className="grid grid-cols-3 gap-2 text-center mb-3">
-                <div className="bg-slate-50 rounded p-2">
-                  <div className="text-xs text-slate-500">Δ(G)</div>
-                  <div className="text-xl font-bold text-slate-800">
+                <div className="bg-slate-800 rounded p-2">
+                  <div className="text-xs text-slate-400">Δ(G)</div>
+                  <div className="text-xl font-bold text-slate-100">
                     {delta}
                   </div>
                 </div>
@@ -887,7 +886,7 @@ export default function EdgeColor() {
                   </div>
                 </div>
               </div>
-              <div className="text-xs text-slate-600 mb-2">
+              <div className="text-xs text-slate-400 mb-2">
                 Vizing: Δ ≤ χ'(G) ≤ Δ+1
               </div>
               {verdict && (
@@ -898,7 +897,7 @@ export default function EdgeColor() {
                 </div>
               )}
               <div className="mt-3">
-                <div className="text-xs text-slate-500 mb-1">Color legend</div>
+                <div className="text-xs text-slate-400 mb-1">Color legend</div>
                 <Legend counts={colorCounts} />
               </div>
             </div>
@@ -912,17 +911,17 @@ export default function EdgeColor() {
 
           {/* SVG + panels */}
           <section className="lg:col-span-2 space-y-4">
-            <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+            <div className="rounded-xl border border-slate-800 bg-slate-900 p-3">
               <div className="flex items-center justify-between mb-2">
-                <div className="text-sm text-slate-600">
+                <div className="text-sm text-slate-400">
                   Step{" "}
-                  <span className="font-mono text-slate-800">
+                  <span className="font-mono text-slate-100">
                     {stepIdx + 1}
                   </span>{" "}
                   / {history.length}
                 </div>
                 {currentStep && (
-                  <div className="text-xs text-slate-600">
+                  <div className="text-xs text-slate-400">
                     banned:&nbsp;
                     {currentStep.banned.length === 0 ? (
                       <span className="italic text-slate-400">∅</span>
@@ -957,7 +956,7 @@ export default function EdgeColor() {
                 viewBox={`0 0 ${SVG_W} ${SVG_H}`}
                 width="100%"
                 height="500"
-                className="bg-slate-50 rounded-lg select-none"
+                className="bg-slate-800 rounded-lg select-none"
                 onMouseMove={onMouseMove}
                 onMouseUp={onMouseUp}
                 onMouseLeave={onMouseUp}

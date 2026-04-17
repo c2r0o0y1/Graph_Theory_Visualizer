@@ -594,14 +594,13 @@ export default function Hall() {
   return (
     <div className="algo-dark min-h-screen py-8">
       <div className="container mx-auto px-4 max-w-7xl">
-        <header className="mb-6">
-          <h1 className="text-3xl font-bold text-slate-800">
+        <header className="mb-4">
+          <h1 className="text-2xl font-bold text-slate-100">
             Hall's Marriage Theorem — Bipartite Matching
           </h1>
-          <p className="text-slate-600 mt-2">
-            A perfect matching from A to B exists iff every subset S ⊆ A has
-            |N(S)| ≥ |S|. Watch augmenting paths build the matching, or watch
-            Hall's condition fail on a tight subset.
+          <p className="text-slate-400 text-sm mt-1">
+            A perfect matching from A to B exists iff every subset S &sube; A has
+            |N(S)| &ge; |S|. Watch augmenting paths build the matching.
           </p>
         </header>
 
@@ -614,14 +613,14 @@ export default function Hall() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* ---------- Controls ---------- */}
           <div className="lg:col-span-1 space-y-4">
-            <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-              <h2 className="font-semibold text-slate-800 mb-3">
+            <section className="bg-slate-900 rounded-xl border border-slate-800 p-4">
+              <h2 className="font-semibold text-slate-100 mb-3">
                 Graph Editor
               </h2>
               <div className="space-y-2 text-sm">
                 <div className="flex gap-2">
                   <input
-                    className="flex-1 px-2 py-1 border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-pink-300"
+                    className="flex-1 px-2 py-1 border border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-pink-300"
                     placeholder="A-node id"
                     value={newAId}
                     onChange={(e) => setNewAId(e.target.value)}
@@ -635,7 +634,7 @@ export default function Hall() {
                 </div>
                 <div className="flex gap-2">
                   <input
-                    className="flex-1 px-2 py-1 border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                    className="flex-1 px-2 py-1 border border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-indigo-300"
                     placeholder="B-node id"
                     value={newBId}
                     onChange={(e) => setNewBId(e.target.value)}
@@ -649,13 +648,13 @@ export default function Hall() {
                 </div>
                 <div className="flex gap-2">
                   <input
-                    className="flex-1 px-2 py-1 border border-slate-300 rounded"
+                    className="flex-1 px-2 py-1 border border-slate-600 rounded"
                     placeholder="A id"
                     value={edgeA}
                     onChange={(e) => setEdgeA(e.target.value)}
                   />
                   <input
-                    className="flex-1 px-2 py-1 border border-slate-300 rounded"
+                    className="flex-1 px-2 py-1 border border-slate-600 rounded"
                     placeholder="B id"
                     value={edgeB}
                     onChange={(e) => setEdgeB(e.target.value)}
@@ -669,7 +668,7 @@ export default function Hall() {
                 </div>
                 <div className="flex gap-2">
                   <input
-                    className="flex-1 px-2 py-1 border border-slate-300 rounded"
+                    className="flex-1 px-2 py-1 border border-slate-600 rounded"
                     placeholder="node id"
                     value={delNode}
                     onChange={(e) => setDelNode(e.target.value)}
@@ -683,13 +682,13 @@ export default function Hall() {
                 </div>
                 <div className="flex gap-2">
                   <input
-                    className="flex-1 px-2 py-1 border border-slate-300 rounded"
+                    className="flex-1 px-2 py-1 border border-slate-600 rounded"
                     placeholder="A id"
                     value={delEdgeA}
                     onChange={(e) => setDelEdgeA(e.target.value)}
                   />
                   <input
-                    className="flex-1 px-2 py-1 border border-slate-300 rounded"
+                    className="flex-1 px-2 py-1 border border-slate-600 rounded"
                     placeholder="B id"
                     value={delEdgeB}
                     onChange={(e) => setDelEdgeB(e.target.value)}
@@ -710,12 +709,12 @@ export default function Hall() {
               </div>
             </section>
 
-            <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-              <h2 className="font-semibold text-slate-800 mb-3">
+            <section className="bg-slate-900 rounded-xl border border-slate-800 p-4">
+              <h2 className="font-semibold text-slate-100 mb-3">
                 Generate & Presets
               </h2>
               <div className="grid grid-cols-3 gap-2 text-sm">
-                <label className="flex flex-col text-slate-600">
+                <label className="flex flex-col text-slate-400">
                   |A|
                   <input
                     type="number"
@@ -723,10 +722,10 @@ export default function Hall() {
                     max={10}
                     value={randA}
                     onChange={(e) => setRandA(+e.target.value)}
-                    className="px-2 py-1 border border-slate-300 rounded"
+                    className="px-2 py-1 border border-slate-600 rounded"
                   />
                 </label>
-                <label className="flex flex-col text-slate-600">
+                <label className="flex flex-col text-slate-400">
                   |B|
                   <input
                     type="number"
@@ -734,10 +733,10 @@ export default function Hall() {
                     max={10}
                     value={randB}
                     onChange={(e) => setRandB(+e.target.value)}
-                    className="px-2 py-1 border border-slate-300 rounded"
+                    className="px-2 py-1 border border-slate-600 rounded"
                   />
                 </label>
-                <label className="flex flex-col text-slate-600">
+                <label className="flex flex-col text-slate-400">
                   p
                   <input
                     type="number"
@@ -746,7 +745,7 @@ export default function Hall() {
                     max={1}
                     value={randP}
                     onChange={(e) => setRandP(+e.target.value)}
-                    className="px-2 py-1 border border-slate-300 rounded"
+                    className="px-2 py-1 border border-slate-600 rounded"
                   />
                 </label>
               </div>
@@ -772,12 +771,12 @@ export default function Hall() {
               </div>
             </section>
 
-            <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-              <h2 className="font-semibold text-slate-800 mb-3">Playback</h2>
+            <section className="bg-slate-900 rounded-xl border border-slate-800 p-4">
+              <h2 className="font-semibold text-slate-100 mb-3">Playback</h2>
               <div className="grid grid-cols-4 gap-2 text-sm">
                 <button
                   onClick={() => setStepIdx((i) => Math.max(0, i - 1))}
-                  className="px-3 py-1.5 bg-slate-200 text-slate-700 rounded hover:bg-slate-300"
+                  className="px-3 py-1.5 bg-slate-200 text-slate-300 rounded hover:bg-slate-300"
                 >◀</button>
                 <button
                   onClick={() => setPlaying((p) => !p)}
@@ -787,14 +786,14 @@ export default function Hall() {
                 </button>
                 <button
                   onClick={() => setStepIdx((i) => Math.min(steps.length - 1, i + 1))}
-                  className="px-3 py-1.5 bg-slate-200 text-slate-700 rounded hover:bg-slate-300"
+                  className="px-3 py-1.5 bg-slate-200 text-slate-300 rounded hover:bg-slate-300"
                 >▶</button>
                 <button
                   onClick={() => { setStepIdx(0); setPlaying(false); }}
                   className="col-span-4 px-3 py-1.5 bg-rose-500 text-white rounded hover:bg-rose-600"
                 >⟲ Reset</button>
               </div>
-              <label className="block mt-3 text-sm text-slate-600">
+              <label className="block mt-3 text-sm text-slate-400">
                 Speed: {speed} ms
                 <input
                   type="range"
@@ -806,14 +805,14 @@ export default function Hall() {
                   className="w-full"
                 />
               </label>
-              <div className="mt-2 text-xs text-slate-500">
+              <div className="mt-2 text-xs text-slate-400">
                 Step {Math.min(stepIdx + 1, steps.length)} / {steps.length}
               </div>
             </section>
 
-            <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-              <h2 className="font-semibold text-slate-800 mb-2">Live State</h2>
-              <div className="text-sm text-slate-700 space-y-1">
+            <section className="bg-slate-900 rounded-xl border border-slate-800 p-4">
+              <h2 className="font-semibold text-slate-100 mb-2">Live State</h2>
+              <div className="text-sm text-slate-300 space-y-1">
                 <div>
                   <span className="font-medium">Current a:</span>{" "}
                   {current.currentA || "—"}
@@ -833,15 +832,15 @@ export default function Hall() {
                     ? matching.map((p) => `${p.a}–${p.b}`).join(", ")
                     : "∅"}
                 </div>
-                <div className="italic text-slate-500">{current.note}</div>
+                <div className="italic text-slate-400">{current.note}</div>
               </div>
             </section>
 
             <section className="bg-gradient-to-r from-amber-50 to-pink-50 border border-amber-200 rounded-xl p-4">
-              <h3 className="font-semibold text-slate-800 mb-1">
+              <h3 className="font-semibold text-slate-100 mb-1">
                 Real-world applications
               </h3>
-              <p className="text-sm text-slate-700">
+              <p className="text-sm text-slate-300">
                 Job-candidate assignment, college admissions, kidney exchange
                 networks, taxi dispatch, resource allocation.
               </p>
@@ -887,11 +886,11 @@ export default function Hall() {
               </div>
             )}
 
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-2">
+            <div className="bg-slate-900 rounded-xl border border-slate-800 p-2">
               <svg
                 id="hall-svg"
                 viewBox="0 0 800 500"
-                className="w-full h-[500px] bg-slate-50 rounded-lg"
+                className="w-full h-[500px] bg-slate-800 rounded-lg"
               >
                 {/* column labels */}
                 <text
@@ -1013,7 +1012,7 @@ export default function Hall() {
                         : "text-slate-300"
                     }`}
                   >
-                    <span className="text-slate-500 mr-2">
+                    <span className="text-slate-400 mr-2">
                       {String(i + 1).padStart(2, "0")}
                     </span>
                     {line || " "}

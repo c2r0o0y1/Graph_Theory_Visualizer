@@ -473,22 +473,22 @@ export default function DFS() {
     <div className="algo-dark min-h-screen py-8">
       <div className="container mx-auto px-4 max-w-7xl">
         {/* Header */}
-        <div className="bg-white rounded-lg shadow border border-slate-200 p-6 mb-6">
-          <h1 className="text-3xl font-bold text-slate-800">Depth-First Search (DFS)</h1>
-          <p className="text-slate-600 mt-2">
+        <header className="mb-4">
+          <h1 className="text-2xl font-bold text-slate-100">Depth-First Search (DFS)</h1>
+          <p className="text-slate-400 text-sm mt-1">
             DFS commits down a branch, hits a dead end, and climbs back.
           </p>
-        </div>
+        </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left: Controls */}
           <div className="lg:col-span-1 space-y-4">
             {/* Graph editing */}
-            <div className="bg-white rounded-lg shadow border border-slate-200 p-4">
-              <h2 className="text-lg font-semibold text-slate-800 mb-3">Graph</h2>
+            <div className="bg-slate-900 rounded-lg border border-slate-800 p-4">
+              <h2 className="text-lg font-semibold text-slate-100 mb-3">Graph</h2>
 
               <div className="flex items-center gap-2 mb-3">
-                <label className="text-sm text-slate-700">Directed</label>
+                <label className="text-sm text-slate-300">Directed</label>
                 <input
                   type="checkbox"
                   checked={directed}
@@ -515,7 +515,7 @@ export default function DFS() {
                     max="25"
                     value={bulkN}
                     onChange={(e) => setBulkN(e.target.value)}
-                    className="flex-1 border border-slate-300 rounded-lg px-2 py-1 text-sm"
+                    className="flex-1 border border-slate-600 rounded-lg bg-slate-800 text-slate-200 px-2 py-1 text-sm"
                   />
                   <button
                     onClick={addBulkNodes}
@@ -525,22 +525,22 @@ export default function DFS() {
                   </button>
                 </div>
 
-                <div className="border-t border-slate-200 pt-2">
-                  <p className="text-xs text-slate-500 mb-1">Add edge</p>
+                <div className="border-t border-slate-700 pt-2">
+                  <p className="text-xs text-slate-400 mb-1">Add edge</p>
                   <div className="flex gap-2">
                     <input
                       type="number"
                       placeholder="from"
                       value={edgeFrom}
                       onChange={(e) => setEdgeFrom(e.target.value)}
-                      className="w-1/2 border border-slate-300 rounded-lg px-2 py-1 text-sm"
+                      className="w-1/2 border border-slate-600 rounded-lg bg-slate-800 text-slate-200 px-2 py-1 text-sm"
                     />
                     <input
                       type="number"
                       placeholder="to"
                       value={edgeTo}
                       onChange={(e) => setEdgeTo(e.target.value)}
-                      className="w-1/2 border border-slate-300 rounded-lg px-2 py-1 text-sm"
+                      className="w-1/2 border border-slate-600 rounded-lg bg-slate-800 text-slate-200 px-2 py-1 text-sm"
                     />
                   </div>
                   <button
@@ -551,15 +551,15 @@ export default function DFS() {
                   </button>
                 </div>
 
-                <div className="border-t border-slate-200 pt-2">
-                  <p className="text-xs text-slate-500 mb-1">Delete node</p>
+                <div className="border-t border-slate-700 pt-2">
+                  <p className="text-xs text-slate-400 mb-1">Delete node</p>
                   <div className="flex gap-2">
                     <input
                       type="number"
                       placeholder="id"
                       value={delNodeId}
                       onChange={(e) => setDelNodeId(e.target.value)}
-                      className="flex-1 border border-slate-300 rounded-lg px-2 py-1 text-sm"
+                      className="flex-1 border border-slate-600 rounded-lg bg-slate-800 text-slate-200 px-2 py-1 text-sm"
                     />
                     <button
                       onClick={deleteNode}
@@ -570,22 +570,22 @@ export default function DFS() {
                   </div>
                 </div>
 
-                <div className="border-t border-slate-200 pt-2">
-                  <p className="text-xs text-slate-500 mb-1">Delete edge</p>
+                <div className="border-t border-slate-700 pt-2">
+                  <p className="text-xs text-slate-400 mb-1">Delete edge</p>
                   <div className="flex gap-2">
                     <input
                       type="number"
                       placeholder="from"
                       value={delEdgeFrom}
                       onChange={(e) => setDelEdgeFrom(e.target.value)}
-                      className="w-1/2 border border-slate-300 rounded-lg px-2 py-1 text-sm"
+                      className="w-1/2 border border-slate-600 rounded-lg bg-slate-800 text-slate-200 px-2 py-1 text-sm"
                     />
                     <input
                       type="number"
                       placeholder="to"
                       value={delEdgeTo}
                       onChange={(e) => setDelEdgeTo(e.target.value)}
-                      className="w-1/2 border border-slate-300 rounded-lg px-2 py-1 text-sm"
+                      className="w-1/2 border border-slate-600 rounded-lg bg-slate-800 text-slate-200 px-2 py-1 text-sm"
                     />
                   </div>
                   <button
@@ -596,7 +596,7 @@ export default function DFS() {
                   </button>
                 </div>
 
-                <div className="border-t border-slate-200 pt-2 flex gap-2">
+                <div className="border-t border-slate-700 pt-2 flex gap-2">
                   <button
                     onClick={generateRandomEdges}
                     className="flex-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg py-1 text-sm"
@@ -613,21 +613,21 @@ export default function DFS() {
               </div>
 
               {error && (
-                <div className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded p-2">
+                <div className="mt-3 text-sm text-red-600 bg-red-900/30 border border-red-700 rounded p-2 text-red-300">
                   {error}
                 </div>
               )}
             </div>
 
             {/* DFS controls */}
-            <div className="bg-white rounded-lg shadow border border-slate-200 p-4">
-              <h2 className="text-lg font-semibold text-slate-800 mb-3">DFS Controls</h2>
+            <div className="bg-slate-900 rounded-lg border border-slate-800 p-4">
+              <h2 className="text-lg font-semibold text-slate-100 mb-3">DFS Controls</h2>
               <div className="flex gap-2 items-center mb-2">
-                <label className="text-sm text-slate-700">Start</label>
+                <label className="text-sm text-slate-300">Start</label>
                 <select
                   value={startId}
                   onChange={(e) => setStartId(parseInt(e.target.value))}
-                  className="flex-1 border border-slate-300 rounded-lg px-2 py-1 text-sm"
+                  className="flex-1 border border-slate-600 rounded-lg bg-slate-800 text-slate-200 px-2 py-1 text-sm"
                 >
                   {nodes.map((n) => (
                     <option key={n.id} value={n.id}>
@@ -667,7 +667,7 @@ export default function DFS() {
                 >⟲</button>
               </div>
               <div className="flex items-center gap-2">
-                <label className="text-xs text-slate-600">Speed</label>
+                <label className="text-xs text-slate-400">Speed</label>
                 <input
                   type="range"
                   min="200"
@@ -677,18 +677,18 @@ export default function DFS() {
                   onChange={(e) => setSpeed(parseInt(e.target.value))}
                   className="flex-1"
                 />
-                <span className="text-xs text-slate-500">{speed}ms</span>
+                <span className="text-xs text-slate-400">{speed}ms</span>
               </div>
               {steps.length > 0 && (
-                <p className="text-xs text-slate-500 mt-2">
+                <p className="text-xs text-slate-400 mt-2">
                   Step {stepIdx + 1} / {steps.length}
                 </p>
               )}
             </div>
 
             {/* Legend */}
-            <div className="bg-white rounded-lg shadow border border-slate-200 p-4 text-xs">
-              <h3 className="font-semibold text-slate-800 mb-2">Legend</h3>
+            <div className="bg-slate-900 rounded-lg border border-slate-800 p-4 text-xs">
+              <h3 className="font-semibold text-slate-100 mb-2">Legend</h3>
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <span className="w-3 h-3 rounded-full inline-block" style={{ background: COLORS.unvisited, border: "1px solid #334155" }} />
@@ -706,7 +706,7 @@ export default function DFS() {
                   <span className="w-3 h-3 rounded-full inline-block" style={{ background: COLORS.visited }} />
                   Finished
                 </div>
-                <div className="border-t border-slate-200 mt-2 pt-2">
+                <div className="border-t border-slate-700 mt-2 pt-2">
                   <div className="flex items-center gap-2"><span className="w-4 h-1 inline-block" style={{ background: COLORS.tree }} />Tree edge</div>
                   <div className="flex items-center gap-2"><span className="w-4 h-1 inline-block" style={{ background: COLORS.back }} />Back edge</div>
                   <div className="flex items-center gap-2"><span className="w-4 h-1 inline-block" style={{ background: COLORS.forward }} />Forward edge</div>
@@ -718,13 +718,13 @@ export default function DFS() {
 
           {/* Right: Canvas + overlays */}
           <div className="lg:col-span-2 space-y-4">
-            <div className="bg-white rounded-lg shadow border border-slate-200 p-4">
+            <div className="bg-slate-900 rounded-lg border border-slate-800 p-4">
               <svg
                 ref={svgRef}
                 width="100%"
                 preserveAspectRatio="xMidYMid meet"
                 viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}
-                className="w-full border border-slate-200 rounded-lg bg-slate-50"
+                className="w-full border border-slate-700 rounded-lg bg-slate-800"
               >
                 {directed && (
                   <defs>
@@ -784,7 +784,7 @@ export default function DFS() {
                 ))}
               </svg>
               {currentStep?.note && (
-                <div className="mt-3 text-sm text-slate-700 bg-blue-50 border border-blue-200 rounded px-3 py-2">
+                <div className="mt-3 text-sm text-slate-300 bg-blue-900/30 border border-blue-700 rounded px-3 py-2">
                   {currentStep.note}
                 </div>
               )}
@@ -792,8 +792,8 @@ export default function DFS() {
 
             {/* Live state + pseudocode */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-white rounded-lg shadow border border-slate-200 p-4">
-                <h3 className="font-semibold text-slate-800 mb-2">Live State</h3>
+              <div className="bg-slate-900 rounded-lg border border-slate-800 p-4">
+                <h3 className="font-semibold text-slate-100 mb-2">Live State</h3>
                 <div className="text-sm space-y-2">
                   <div>
                     <span className="font-semibold text-amber-600">Stack (top → bottom):</span>
@@ -840,17 +840,17 @@ export default function DFS() {
                     </span>
                   </div>
                   <div>
-                    <span className="font-semibold text-slate-700">Time:</span>{" "}
+                    <span className="font-semibold text-slate-300">Time:</span>{" "}
                     <span className="font-mono">{currentStep?.time ?? 0}</span>
                   </div>
                   {currentStep && currentStep.d.size > 0 && (
                     <div>
-                      <span className="font-semibold text-slate-700">d/f table:</span>
+                      <span className="font-semibold text-slate-300">d/f table:</span>
                       <div className="mt-1 grid grid-cols-4 gap-1 text-xs font-mono">
                         {[...currentStep.d.entries()].map(([id, dv]) => (
                           <span
                             key={id}
-                            className="bg-slate-100 border border-slate-200 rounded px-1 py-0.5 text-center"
+                            className="bg-slate-700 border border-slate-600 rounded px-1 py-0.5 text-center text-slate-200"
                           >
                             {id}: {dv}/{currentStep.f.get(id) ?? "?"}
                           </span>
@@ -861,8 +861,8 @@ export default function DFS() {
                 </div>
               </div>
 
-              <div className="bg-white rounded-lg shadow border border-slate-200 p-4">
-                <h3 className="font-semibold text-slate-800 mb-2">Pseudocode</h3>
+              <div className="bg-slate-900 rounded-lg border border-slate-800 p-4">
+                <h3 className="font-semibold text-slate-100 mb-2">Pseudocode</h3>
                 <pre className="text-xs font-mono leading-relaxed bg-slate-900 text-slate-100 rounded p-3 overflow-x-auto">
                   {PSEUDOCODE.map((line, i) => (
                     <div
@@ -883,7 +883,7 @@ export default function DFS() {
             {/* Applications callout */}
             <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg shadow p-5">
               <h3 className="font-semibold text-purple-800 mb-1">Real-World Applications</h3>
-              <p className="text-sm text-slate-700">
+              <p className="text-sm text-slate-300">
                 Applications: topological sort, cycle detection, strongly connected
                 components, maze solving, compiler call graphs.
               </p>

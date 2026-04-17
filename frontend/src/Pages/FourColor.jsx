@@ -324,25 +324,20 @@ export default function FourColor() {
     <div className="algo-dark min-h-screen py-8">
       <div className="container mx-auto px-4 max-w-7xl">
         {/* Header */}
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 mb-6">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="grid grid-cols-2 gap-0.5 w-10 h-10 rounded-lg overflow-hidden shadow">
-              {FOUR.map((c) => <div key={c} style={{ background: c }} />)}
-            </div>
-            <h1 className="text-2xl font-bold text-slate-800">Four Color Theorem</h1>
-          </div>
-          <p className="text-slate-600 text-sm">
-            Every planar graph is 4-colorable. Appel &amp; Haken (1976) — the first major theorem proved by computer.
-            Watch DSATUR drive a 4-coloring, with Kempe-chain recolorings when the greedy step gets boxed in.
+        <header className="mb-4">
+          <h1 className="text-2xl font-bold text-slate-100">Four Color Theorem</h1>
+          <p className="text-slate-400 text-sm mt-1">
+            Every planar graph is 4-colorable (Appel &amp; Haken 1976).
+            DSATUR + Kempe-chain recolorings when the greedy step gets boxed in.
           </p>
-        </div>
+        </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Controls */}
           <div className="lg:col-span-1 space-y-4">
             {/* Presets */}
-            <div className="bg-white rounded-xl shadow border border-slate-200 p-4">
-              <h3 className="font-bold text-slate-800 mb-3 pb-2 border-b-2 border-red-200">Planar Presets</h3>
+            <div className="bg-slate-900 rounded-lg border border-slate-800 p-4">
+              <h3 className="text-sm font-semibold text-slate-300 mb-3">Planar Presets</h3>
               <div className="space-y-2">
                 <button onClick={() => { const { ns, es } = makeUSMap(); setNodes(ns); setEdges(es); setHistory([]); setStepIdx(0); }}
                         className="w-full px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium">
@@ -364,25 +359,25 @@ export default function FourColor() {
             </div>
 
             {/* Editor */}
-            <div className="bg-white rounded-xl shadow border border-slate-200 p-4">
-              <h3 className="font-bold text-slate-800 mb-3 pb-2 border-b-2 border-red-200">Editor</h3>
+            <div className="bg-slate-900 rounded-xl border border-slate-800 p-4">
+              <h3 className="font-bold text-slate-100 mb-3 pb-2 border-b-2 border-red-800">Editor</h3>
               <button onClick={addNode} className="w-full px-3 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 text-sm mb-2">+ Add Node</button>
               <div className="flex gap-2 mb-2">
-                <input type="number" value={tempFrom} onChange={(e) => setTempFrom(e.target.value)} placeholder="from" className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm" />
-                <input type="number" value={tempTo} onChange={(e) => setTempTo(e.target.value)} placeholder="to" className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+                <input type="number" value={tempFrom} onChange={(e) => setTempFrom(e.target.value)} placeholder="from" className="flex-1 px-3 py-2 border border-slate-600 rounded-lg text-sm bg-slate-800 text-slate-200" />
+                <input type="number" value={tempTo} onChange={(e) => setTempTo(e.target.value)} placeholder="to" className="flex-1 px-3 py-2 border border-slate-600 rounded-lg text-sm bg-slate-800 text-slate-200" />
               </div>
               <div className="flex gap-2 mb-2">
                 <button onClick={addEdge} className="flex-1 px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm">+ Edge</button>
                 <button onClick={delEdge} className="flex-1 px-3 py-2 bg-rose-500 text-white rounded-lg hover:bg-rose-600 text-sm">− Edge</button>
               </div>
               <button onClick={clearAll} className="w-full px-3 py-2 bg-slate-500 text-white rounded-lg hover:bg-slate-600 text-sm">Clear All</button>
-              {err && <div className="mt-2 text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded p-2">⚠ {err}</div>}
-              <div className="mt-2 text-xs text-slate-500">Right-click a node to delete it.</div>
+              {err && <div className="mt-2 text-xs text-rose-400 bg-rose-900/30 border border-rose-700 rounded p-2">⚠ {err}</div>}
+              <div className="mt-2 text-xs text-slate-400">Right-click a node to delete it.</div>
             </div>
 
             {/* Algorithm */}
-            <div className="bg-white rounded-xl shadow border border-slate-200 p-4">
-              <h3 className="font-bold text-slate-800 mb-3 pb-2 border-b-2 border-red-200">Run</h3>
+            <div className="bg-slate-900 rounded-xl border border-slate-800 p-4">
+              <h3 className="font-bold text-slate-100 mb-3 pb-2 border-b-2 border-red-800">Run</h3>
               <button onClick={run} className="w-full px-3 py-2 bg-gradient-to-r from-red-500 via-amber-500 to-emerald-500 text-white rounded-lg text-sm font-bold mb-2">▶ Compute 4-Coloring</button>
               <div className="flex gap-2 mb-2">
                 <button onClick={() => setStepIdx((i) => Math.max(0, i - 1))} disabled={!history.length} className="flex-1 px-2 py-1.5 bg-slate-200 rounded text-sm disabled:opacity-50">◀</button>
@@ -390,24 +385,24 @@ export default function FourColor() {
                 <button onClick={() => setStepIdx((i) => Math.min(history.length - 1, i + 1))} disabled={!history.length} className="flex-1 px-2 py-1.5 bg-slate-200 rounded text-sm disabled:opacity-50">▶</button>
                 <button onClick={() => { setStepIdx(0); setPlaying(false); }} disabled={!history.length} className="flex-1 px-2 py-1.5 bg-amber-500 text-white rounded text-sm disabled:opacity-50">⟲</button>
               </div>
-              <label className="block text-xs text-slate-600 mb-1">Speed: {speed}ms</label>
+              <label className="block text-xs text-slate-400 mb-1">Speed: {speed}ms</label>
               <input type="range" min={150} max={1500} step={50} value={speed} onChange={(e) => setSpeed(+e.target.value)} className="w-full" />
-              <div className="mt-2 text-xs text-slate-500">Step {history.length ? stepIdx + 1 : 0} / {history.length}</div>
+              <div className="mt-2 text-xs text-slate-400">Step {history.length ? stepIdx + 1 : 0} / {history.length}</div>
             </div>
 
             {/* Stats */}
-            <div className="bg-white rounded-xl shadow border border-slate-200 p-4">
-              <h3 className="font-bold text-slate-800 mb-3 pb-2 border-b-2 border-red-200">Stats</h3>
+            <div className="bg-slate-900 rounded-xl border border-slate-800 p-4">
+              <h3 className="font-bold text-slate-100 mb-3 pb-2 border-b-2 border-red-800">Stats</h3>
               <div className="grid grid-cols-2 gap-2 text-sm">
-                <div className="bg-slate-50 rounded p-2"><div className="text-xs text-slate-500">|V|</div><div className="font-bold">{nodes.length}</div></div>
-                <div className="bg-slate-50 rounded p-2"><div className="text-xs text-slate-500">|E|</div><div className="font-bold">{edges.length}</div></div>
-                <div className="bg-slate-50 rounded p-2 col-span-2"><div className="text-xs text-slate-500">Colors in use</div><div className="font-bold text-red-700">{usedColors.size} / 4</div></div>
+                <div className="bg-slate-800 rounded p-2"><div className="text-xs text-slate-400">|V|</div><div className="font-bold">{nodes.length}</div></div>
+                <div className="bg-slate-800 rounded p-2"><div className="text-xs text-slate-400">|E|</div><div className="font-bold">{edges.length}</div></div>
+                <div className="bg-slate-800 rounded p-2 col-span-2"><div className="text-xs text-slate-400">Colors in use</div><div className="font-bold text-red-700">{usedColors.size} / 4</div></div>
               </div>
-              <div className={`mt-2 p-2 rounded border text-xs ${hint.ok ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-800'}`}>
+              <div className={`mt-2 p-2 rounded border text-xs ${hint.ok ? 'bg-emerald-900/30 border-emerald-700 text-emerald-300' : 'bg-rose-900/30 border-rose-700 text-rose-300'}`}>
                 {hint.ok ? '✓' : '✗'} {hint.msg}
               </div>
               <div className="mt-3">
-                <div className="text-xs text-slate-500 mb-1">Color-class sizes</div>
+                <div className="text-xs text-slate-400 mb-1">Color-class sizes</div>
                 <div className="flex gap-1">
                   {FOUR.map((c, i) => (
                     <div key={c} className="flex-1 text-center">
@@ -422,13 +417,13 @@ export default function FourColor() {
 
           {/* Canvas + overlays */}
           <div className="lg:col-span-2 space-y-4">
-            <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-4">
+            <div className="bg-slate-900 rounded-xl border border-slate-800 p-4">
               <div className="flex items-center justify-between mb-2">
-                <div className="text-xs font-semibold text-slate-700">{state.label}</div>
-                <div className="text-xs text-slate-500">Drag nodes freely • right-click to delete</div>
+                <div className="text-xs font-semibold text-slate-300">{state.label}</div>
+                <div className="text-xs text-slate-400">Drag nodes freely • right-click to delete</div>
               </div>
               <svg ref={svgRef} viewBox={`0 0 ${SVG_W} ${SVG_H}`} width="100%"
-                   className="border border-slate-200 rounded-lg bg-slate-50">
+                   className="border border-slate-700 rounded-lg bg-slate-800">
                 {edges.map((e) => {
                   const a = nodes.find((n) => n.id === e.from);
                   const b = nodes.find((n) => n.id === e.to);
@@ -450,28 +445,28 @@ export default function FourColor() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Pseudocode */}
-              <div className="bg-white rounded-xl shadow border border-slate-200 p-4">
-                <h3 className="font-bold text-slate-800 mb-2">Pseudocode</h3>
+              <div className="bg-slate-900 rounded-xl border border-slate-800 p-4">
+                <h3 className="font-bold text-slate-100 mb-2">Pseudocode</h3>
                 <pre className="text-xs font-mono leading-relaxed">
                   {PSEUDOCODE.map((l, i) => (
-                    <div key={i} className={`px-2 py-0.5 rounded ${i === state.line ? 'bg-amber-100 text-amber-900 font-bold' : 'text-slate-700'}`}>{l}</div>
+                    <div key={i} className={`px-1 py-0.5 rounded ${i === state.line ? 'bg-amber-500/20 text-amber-300 font-bold' : 'text-slate-300'}`}>{l}</div>
                   ))}
                 </pre>
               </div>
 
               {/* Palette legend */}
-              <div className="bg-white rounded-xl shadow border border-slate-200 p-4">
-                <h3 className="font-bold text-slate-800 mb-2">Four-Color Palette</h3>
+              <div className="bg-slate-900 rounded-xl border border-slate-800 p-4">
+                <h3 className="font-bold text-slate-100 mb-2">Four-Color Palette</h3>
                 <div className="space-y-2">
                   {FOUR.map((c, i) => (
                     <div key={c} className="flex items-center gap-2">
                       <span className="inline-block w-5 h-5 rounded" style={{ background: c }}></span>
                       <span className="text-sm font-mono">{i + 1}. {FOUR_NAMES[i]}</span>
-                      <span className="text-xs text-slate-500 ml-auto">{counts[i]} vertices</span>
+                      <span className="text-xs text-slate-400 ml-auto">{counts[i]} vertices</span>
                     </div>
                   ))}
                 </div>
-                <div className="mt-3 pt-2 border-t border-slate-100 text-xs text-slate-600">
+                <div className="mt-3 pt-2 border-t border-slate-700 text-xs text-slate-400">
                   <b>Theorem (Appel–Haken, 1976):</b> χ(G) ≤ 4 for every planar graph G.
                   For non-planar graphs, 4 colors may not suffice — try K_5.
                 </div>

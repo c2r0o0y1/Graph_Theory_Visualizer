@@ -113,77 +113,67 @@ export default function Home() {
 
       {/* ── Hero ──────────────────────────────────────────────────────── */}
       <section className="border-b border-slate-800">
-        <div className="max-w-6xl mx-auto px-6 py-20 md:py-28">
-          <p className="font-mono text-xs tracking-widest text-cyan-400 uppercase mb-6">
-            Graph Theory Visualizer — Interactive Research Tool
-          </p>
-          <h1 className="text-4xl md:text-6xl lg:text-7xl font-black tracking-tight leading-[1.05] text-white max-w-4xl">
-            Translating dense discrete mathematics into an{' '}
-            <span className="text-cyan-400">interactive spatial laboratory.</span>
+        <div className="max-w-4xl mx-auto px-6 py-14 md:py-20">
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-white leading-tight">
+            Designing a Graph Theory Visualizer:
+            <br />
+            <span className="text-cyan-400">Making Abstract Structures Tangible</span>
           </h1>
-          <p className="mt-6 text-slate-400 text-lg md:text-xl max-w-2xl leading-relaxed">
-            Graph theory deals with dynamic, evolving structures. We still teach
-            it with static diagrams. This tool fixes that — BFS, DFS, Hall's
-            theorem, Vizing's theorem, the Four Color Theorem, and the
-            polynomial-time Kierstead–Kostochka algorithm, all animated,
-            step-by-step.
-          </p>
-          <p className="mt-3 font-mono text-sm text-slate-500">
-            Suman Dangal* · Saharsha Pandey · Chhandak Roy '24
+          <p className="mt-4 font-mono text-sm text-slate-500">
+            Suman Dangal* &middot; Saharsha Pandey &middot; Chhandak Roy '24
             <span className="mx-3 text-slate-700">|</span>
             Advisor: Dr. Tyler Markenen
           </p>
-          <div className="mt-8 flex flex-wrap gap-3">
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link
+              to="/bfs"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 rounded-lg text-sm font-medium hover:bg-cyan-500/20 transition-colors"
+            >
+              Open Visualizer &rarr;
+            </Link>
             <a
               href="https://github.com/L00SIRE/Graph_Theory_Visualizer-1"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-white text-slate-900 rounded-lg text-sm font-semibold hover:bg-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-slate-950"
+              className="inline-flex items-center gap-2 px-4 py-2 text-slate-400 border border-slate-700 rounded-lg text-sm font-medium hover:text-slate-200 hover:border-slate-600 transition-colors"
             >
-              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
-                <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
-              </svg>
-              View Source
+              Source
             </a>
-            <Link
-              to="/bfs"
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 rounded-lg text-sm font-semibold hover:bg-cyan-500/20 transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500"
-            >
-              Open Visualizer
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-              </svg>
-            </Link>
           </div>
         </div>
       </section>
 
       {/* ── Abstract ──────────────────────────────────────────────────── */}
       <section className="border-b border-slate-800">
-        <div className="max-w-6xl mx-auto px-6 py-16 grid md:grid-cols-3 gap-12">
-          <div className="md:col-span-1">
-            <p className="font-mono text-xs tracking-widest text-cyan-400 uppercase mb-3">Abstract</p>
-            <h2 className="text-2xl font-bold text-white leading-tight">
-              Making Abstract Structures Tangible
-            </h2>
-          </div>
-          <div className="md:col-span-2 space-y-4 text-slate-400 leading-relaxed">
+        <div className="max-w-4xl mx-auto px-6 py-12">
+          <h2 className="font-mono text-xs tracking-widest text-slate-500 uppercase mb-4">Abstract</h2>
+          <div className="space-y-4 text-slate-400 text-sm leading-relaxed">
             <p>
-              Graph theory fundamentally deals with dynamic, evolving structures, yet
-              we still largely teach it using static textbook diagrams and chalkboard
-              proofs. This cognitive overload leads to an "illusion of understanding,"
-              where learners passively watch a process without grasping the underlying logic.
+              Graph theory fundamentally deals with dynamic and evolving structures.
+              Yet it's still largely taught using static textbook diagrams and chalkboard
+              proofs. For students, mentally simulating how a complex algorithm alters a
+              network step-by-step can be exhausting. This cognitive overload often leads
+              to an "illusion of understanding," where learners passively watch a process
+              without truly grasping the underlying logic.
             </p>
             <p>
-              Our platform goes beyond traversal algorithms, uniquely extending into
-              advanced combinatorics — visualizing proofs like Hall's marriage theorem,
-              the four color theorem, Vizing's theorem, and the polynomial-time
-              Kierstead–Kostochka algorithm for the Hajnal–Szemerédi Theorem.
+              To bridge this gap, we introduce a highly interactive visualization system
+              that turns graph theory from a passive reading exercise into a hands-on,
+              exploratory lab. Powered by a click-and-control layout engine, the tool
+              allows users to build graphs on a canvas and manipulate them in real time.
+              Our platform goes beyond traversal algorithms like breadth-first and
+              depth-first search, uniquely extending into advanced combinatorics. It
+              enables the user to visualize complex proofs — like Hall's marriage theorem,
+              the four color theorem, Vizing's theorem for edge colorings, and the
+              polynomial-time Kierstead-Kostochka algorithm for the Hajnal-Szemerédi
+              Theorem — by translating dense algebraic logic into intuitive spatial puzzles.
             </p>
             <p>
-              We let software do the heavy lifting of tracking algorithmic state, so
-              students' brains can grasp the concept. Every algorithm pre-computes its
-              full step history; scrubbing forward and backward is instant.
+              We let software do the heavy lifting to track the algorithm's states so
+              that students can focus on the actual concepts. Ultimately, this active
+              approach fosters a more collaborative and inclusive learning environment.
+              It helps students access advanced mathematics, allowing them to see
+              algorithms step by step.
             </p>
           </div>
         </div>
@@ -191,13 +181,11 @@ export default function Home() {
 
       {/* ── H-S Workflow ──────────────────────────────────────────────── */}
       <section className="border-b border-slate-800">
-        <div className="max-w-6xl mx-auto px-6 py-16">
-          <p className="font-mono text-xs tracking-widest text-cyan-400 uppercase mb-3">H-S Simulator — UX Workflow</p>
-          <h2 className="text-3xl font-bold text-white mb-2">
-            The Kierstead–Kostochka Algorithm, Visualized
+        <div className="max-w-4xl mx-auto px-6 py-12">
+          <h2 className="text-lg font-bold text-white mb-1">
+            Kierstead–Kostochka — Color Legend &amp; Steps
           </h2>
-          <p className="text-slate-400 mb-10 max-w-2xl">
-            Every snapshot of the algorithm is pre-computed. Navigate the proof by pressing a single key.
+          <p className="text-slate-500 text-sm mb-6">
             Color coding maps directly to algorithmic role.
           </p>
 
@@ -263,9 +251,8 @@ export default function Home() {
 
       {/* ── Tool Palette ──────────────────────────────────────────────── */}
       <section className="border-b border-slate-800">
-        <div className="max-w-6xl mx-auto px-6 py-16">
-          <p className="font-mono text-xs tracking-widest text-cyan-400 uppercase mb-3">Modules</p>
-          <h2 className="text-3xl font-bold text-white mb-10">Algorithm Tool Palette</h2>
+        <div className="max-w-4xl mx-auto px-6 py-12">
+          <h2 className="text-lg font-bold text-white mb-6">Algorithms</h2>
 
           <div className="flex flex-col lg:flex-row gap-0 border border-slate-800 rounded-2xl overflow-hidden">
             {/* Left: tool list */}
@@ -331,24 +318,6 @@ export default function Home() {
               </div>
             </div>
           </div>
-        </div>
-      </section>
-
-      {/* ── Feature strip ─────────────────────────────────────────────── */}
-      <section className="border-b border-slate-800">
-        <div className="max-w-6xl mx-auto px-6 py-12 grid sm:grid-cols-2 lg:grid-cols-4 gap-px bg-slate-800">
-          {[
-            { mono: 'O(1) seek', title: 'Pre-computed histories', body: 'Every step pre-baked. Scrub forward and back instantly at any speed.' },
-            { mono: 'SVG + viewBox', title: 'Responsive canvas', body: 'Force-directed layout. Pan, drag, zoom. Nodes clamp to boundary — nothing escapes the frame.' },
-            { mono: 'adj. list', title: 'Live state overlays', body: 'Queue, stack, visited sets, color assignments, matching maps — all readable, not console noise.' },
-            { mono: 'Brooks · Vizing · Hall', title: 'Theorem bounds displayed', body: 'Every coloring result compared against the tightest known theoretical upper bound.' },
-          ].map(({ mono, title, body }) => (
-            <div key={title} className="bg-slate-950 p-6">
-              <p className="font-mono text-xs text-cyan-400 mb-3">{mono}</p>
-              <p className="text-sm font-semibold text-white mb-2">{title}</p>
-              <p className="text-sm text-slate-400 leading-relaxed">{body}</p>
-            </div>
-          ))}
         </div>
       </section>
 

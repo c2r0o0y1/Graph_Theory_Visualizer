@@ -252,7 +252,7 @@ const Btn = memo(function Btn({ onClick, children, variant = "indigo", title }) 
     violet: "bg-violet-600 hover:bg-violet-700",
     emerald: "bg-emerald-600 hover:bg-emerald-700",
     amber: "bg-amber-500 hover:bg-amber-600",
-    slate: "bg-slate-500 hover:bg-slate-600",
+    slate: "bg-slate-8000 hover:bg-slate-600",
     red: "bg-red-500 hover:bg-red-600",
   };
   return (
@@ -273,7 +273,7 @@ const TxtInput = memo(function TxtInput({ value, onChange, placeholder, classNam
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className={`w-full border border-slate-300 rounded-md px-2 py-1 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none ${className}`}
+      className={`w-full border border-slate-600 rounded-md px-2 py-1 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none ${className}`}
     />
   );
 });
@@ -698,14 +698,14 @@ export default function GreedyColor() {
   return (
     <div className="algo-dark min-h-screen py-8">
       <div className="container mx-auto px-4 max-w-7xl">
-        <header className="mb-6">
-          <h1 className="text-3xl font-bold text-slate-800">
+        <header className="mb-4">
+          <h1 className="text-2xl font-bold text-slate-100">
             Greedy Vertex Coloring — Brooks' Theorem
           </h1>
-          <p className="text-slate-600 mt-2">
+          <p className="text-slate-400 text-sm mt-1">
             Color each vertex with the smallest color not used by its neighbors.
             For any connected graph that isn't a complete graph or an odd cycle,
-            χ(G) ≤ Δ(G).
+            &chi;(G) &le; &Delta;(G).
           </p>
         </header>
 
@@ -713,8 +713,8 @@ export default function GreedyColor() {
           {/* Controls column */}
           <div className="lg:col-span-1 space-y-4">
             {/* Graph editing */}
-            <div className="bg-white rounded-lg shadow p-4 border border-slate-200">
-              <h2 className="font-semibold text-slate-700 mb-2">Graph Editing</h2>
+            <div className="bg-slate-900 rounded-lg border border-slate-800 p-4">
+              <h2 className="font-semibold text-slate-300 mb-2">Graph Editing</h2>
               <div className="flex gap-2 mb-2">
                 <Btn onClick={addNode} variant="indigo">
                   + Add Node
@@ -757,24 +757,24 @@ export default function GreedyColor() {
             </div>
 
             {/* Generators */}
-            <div className="bg-white rounded-lg shadow p-4 border border-slate-200">
-              <h2 className="font-semibold text-slate-700 mb-2">Generators</h2>
+            <div className="bg-slate-900 rounded-lg border border-slate-800 p-4">
+              <h2 className="font-semibold text-slate-300 mb-2">Generators</h2>
               <div className="flex gap-1 mb-2 items-center">
-                <label className="text-xs text-slate-600">Kₙ:</label>
+                <label className="text-xs text-slate-400">Kₙ:</label>
                 <TxtInput value={kInput} onChange={setKInput} placeholder="n" />
                 <Btn onClick={generateKn} variant="violet">
                   Complete Kₙ
                 </Btn>
               </div>
               <div className="flex gap-1 mb-2 items-center">
-                <label className="text-xs text-slate-600">C<sub>2k+1</sub>:</label>
+                <label className="text-xs text-slate-400">C<sub>2k+1</sub>:</label>
                 <TxtInput value={cycleInput} onChange={setCycleInput} placeholder="odd n" />
                 <Btn onClick={generateOddCycle} variant="violet">
                   Odd Cycle
                 </Btn>
               </div>
               <div className="flex gap-1 items-center">
-                <label className="text-xs text-slate-600">d-reg:</label>
+                <label className="text-xs text-slate-400">d-reg:</label>
                 <TxtInput value={regN} onChange={setRegN} placeholder="n" />
                 <TxtInput value={regD} onChange={setRegD} placeholder="d" />
                 <Btn onClick={generateRandomRegular} variant="violet">
@@ -784,12 +784,12 @@ export default function GreedyColor() {
             </div>
 
             {/* Ordering + run controls */}
-            <div className="bg-white rounded-lg shadow p-4 border border-slate-200">
-              <h2 className="font-semibold text-slate-700 mb-2">Ordering & Run</h2>
+            <div className="bg-slate-900 rounded-lg border border-slate-800 p-4">
+              <h2 className="font-semibold text-slate-300 mb-2">Ordering & Run</h2>
               <select
                 value={strategy}
                 onChange={(e) => setStrategy(e.target.value)}
-                className="w-full border border-slate-300 rounded-md px-2 py-1 text-sm mb-2"
+                className="w-full border border-slate-600 rounded-md px-2 py-1 text-sm mb-2"
               >
                 <option value="id">By ID</option>
                 <option value="random">Random</option>
@@ -811,7 +811,7 @@ export default function GreedyColor() {
                 <Btn onClick={reset} variant="red">⟲</Btn>
               </div>
               <div>
-                <label className="text-xs text-slate-600">
+                <label className="text-xs text-slate-400">
                   Speed: {speed} ms
                 </label>
                 <input
@@ -826,7 +826,7 @@ export default function GreedyColor() {
               </div>
               {order.length > 0 && (
                 <div className="mt-2">
-                  <div className="text-xs text-slate-600 mb-1">Ordered queue:</div>
+                  <div className="text-xs text-slate-400 mb-1">Ordered queue:</div>
                   <div className="flex flex-wrap gap-1">
                     {order.map((id, i) => (
                       <span
@@ -834,7 +834,7 @@ export default function GreedyColor() {
                         className={`px-2 py-0.5 rounded text-xs font-mono ${
                           state.current === id
                             ? "bg-amber-400 text-slate-900"
-                            : "bg-slate-200 text-slate-700"
+                            : "bg-slate-200 text-slate-300"
                         }`}
                       >
                         {id}
@@ -846,9 +846,9 @@ export default function GreedyColor() {
             </div>
 
             {/* Stats */}
-            <div className="bg-white rounded-lg shadow p-4 border border-slate-200">
-              <h2 className="font-semibold text-slate-700 mb-2">Live Stats</h2>
-              <ul className="text-sm text-slate-700 space-y-1">
+            <div className="bg-slate-900 rounded-lg border border-slate-800 p-4">
+              <h2 className="font-semibold text-slate-300 mb-2">Live Stats</h2>
+              <ul className="text-sm text-slate-300 space-y-1">
                 <li>|V| = {nodes.length}, |E| = {edges.length}</li>
                 <li>Δ(G) = {delta}</li>
                 <li>Connected: {connected ? "yes" : "no"}</li>
@@ -883,7 +883,7 @@ export default function GreedyColor() {
               </ul>
               {colorsUsed.length > 0 && (
                 <div className="mt-2">
-                  <div className="text-xs text-slate-600 mb-1">Color legend:</div>
+                  <div className="text-xs text-slate-400 mb-1">Color legend:</div>
                   <div className="flex flex-wrap gap-2">
                     {colorsUsed.map((c) => (
                       <div key={c} className="flex items-center gap-1 text-xs">
@@ -912,12 +912,12 @@ export default function GreedyColor() {
 
           {/* SVG + panels column */}
           <div className="lg:col-span-2 space-y-4">
-            <div className="bg-white rounded-lg shadow p-2 border border-slate-200">
+            <div className="bg-slate-900 rounded-lg border border-slate-800 p-2">
               <svg
                 ref={svgRef}
                 width="100%"
                 viewBox={`0 0 ${SVG_W} ${SVG_H}`}
-                className="bg-slate-50 rounded"
+                className="bg-slate-800 rounded"
               >
                 {/* edges */}
                 {edges.map((e, i) => {
@@ -1001,7 +1001,7 @@ export default function GreedyColor() {
                   );
                 })}
               </svg>
-              <div className="text-xs text-slate-600 mt-1 px-2 italic">
+              <div className="text-xs text-slate-400 mt-1 px-2 italic">
                 {state.note}
                 {state.used && state.used.length > 0 && (
                   <span>
@@ -1020,16 +1020,16 @@ export default function GreedyColor() {
             </div>
 
             {/* Pseudocode */}
-            <div className="bg-white rounded-lg shadow p-4 border border-slate-200">
-              <h2 className="font-semibold text-slate-700 mb-2">Pseudocode</h2>
-              <pre className="text-sm font-mono leading-relaxed bg-slate-50 rounded p-3 overflow-x-auto">
+            <div className="bg-slate-900 rounded-lg border border-slate-800 p-4">
+              <h2 className="font-semibold text-slate-300 mb-2">Pseudocode</h2>
+              <pre className="text-sm font-mono leading-relaxed bg-slate-800 rounded p-3 overflow-x-auto">
                 {PSEUDO.map((ln, i) => (
                   <div
                     key={i}
                     className={`px-2 rounded ${
                       state.line === i
                         ? "bg-amber-200 text-slate-900 font-bold"
-                        : "text-slate-700"
+                        : "text-slate-300"
                     }`}
                   >
                     {ln}
@@ -1043,7 +1043,7 @@ export default function GreedyColor() {
               <h2 className="font-semibold text-indigo-800 mb-1">
                 Real-world applications
               </h2>
-              <p className="text-sm text-slate-700">
+              <p className="text-sm text-slate-300">
                 Applications: register allocation, exam timetabling, frequency
                 assignment, Sudoku constraints, map coloring.
               </p>
