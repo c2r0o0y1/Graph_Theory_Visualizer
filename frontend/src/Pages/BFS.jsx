@@ -1,2223 +1,1318 @@
-import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 
-// Custom CSS for professional scrollbars
-const scrollbarStyles = `
-  /* Webkit browsers (Chrome, Safari, Edge) */
-  .custom-scrollbar::-webkit-scrollbar {
-    width: 12px;
-    height: 12px;
-  }
+const SVG_WIDTH = 860;
+const SVG_HEIGHT = 520;
+const NODE_RADIUS = 24;
 
-  .custom-scrollbar::-webkit-scrollbar-track {
-    background: #f8fafc;
-    border-radius: 6px;
-    border: 1px solid #e2e8f0;
-  }
+const buttonBase =
+  'rounded-lg px-3 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40';
 
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: linear-gradient(135deg, #64748b, #475569);
-    border-radius: 6px;
-    border: 2px solid #f8fafc;
-    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
-  }
+const BFS_PSEUDOCODE = [
+  { line: 1, text: 'Initialize queue Q' },
+  { line: 2, text: 'Mark source as visited' },
+  { line: 3, text: 'Set distance[source] = 0' },
+  { line: 4, text: 'Enqueue source into Q' },
+  { line: 5, text: 'While Q is not empty:' },
+  { line: 6, text: '    Dequeue node u from Q' },
+  { line: 7, text: '    For each neighbor v of u:' },
+  { line: 8, text: '        If v is not visited:' },
+  { line: 9, text: '            Mark v as visited' },
+  { line: 10, text: '            Set parent[v] = u' },
+  { line: 11, text: '            Set distance[v] = distance[u] + 1' },
+  { line: 12, text: '            Enqueue v into Q' },
+];
 
-  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(135deg, #475569, #334155);
-    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
-  }
+const toEdgeKey = (a, b) => {
+  const lo = Math.min(a, b);
+  const hi = Math.max(a, b);
+  return `${lo}-${hi}`;
+};
 
-  .custom-scrollbar::-webkit-scrollbar-thumb:active {
-    background: linear-gradient(135deg, #334155, #1e293b);
-  }
+const sortNumeric = (arr) => [...arr].sort((a, b) => a - b);
+const shuffle = (arr) => [...arr].sort(() => Math.random() - 0.5);
 
-  .custom-scrollbar::-webkit-scrollbar-corner {
-    background: #f8fafc;
-  }
+const buildAdjacency = (nodes, edges) => {
+  const adj = {};
+  nodes.forEach((n) => {
+    adj[n.id] = [];
+  });
 
-  /* Firefox */
-  .custom-scrollbar {
-    scrollbar-width: thin;
-    scrollbar-color: #64748b #f8fafc;
-  }
+  edges.forEach((edge) => {
+    if (adj[edge.from] && adj[edge.to]) {
+      adj[edge.from].push(edge.to);
+      adj[edge.to].push(edge.from);
+    }
+  });
 
-  /* Thin scrollbar for algorithm steps */
-  .thin-scrollbar::-webkit-scrollbar {
-    width: 8px;
-  }
+  Object.keys(adj).forEach((id) => {
+    adj[id] = sortNumeric(adj[id]);
+  });
 
-  .thin-scrollbar::-webkit-scrollbar-track {
-    background: #f1f5f9;
-    border-radius: 4px;
-  }
+  return adj;
+};
 
-  .thin-scrollbar::-webkit-scrollbar-thumb {
-    background: linear-gradient(135deg, #3b82f6, #2563eb);
-    border-radius: 4px;
-    border: 1px solid #f1f5f9;
-  }
-
-  .thin-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(135deg, #2563eb, #1d4ed8);
-  }
-
-  .thin-scrollbar {
-    scrollbar-width: thin;
-    scrollbar-color: #3b82f6 #f1f5f9;
-  }
-`;
-
-// Add styles to document head
-if (typeof document !== 'undefined') {
-  const styleSheet = document.createElement("style");
-  styleSheet.innerText = scrollbarStyles;
-  document.head.appendChild(styleSheet);
-}
-
-// Optimized Node Component
-const DraggableNode = memo(({ 
-  node, 
-  isInPath, 
-  isCurrentStep, 
-  nodeColor, 
-  isDragged,
-  showCoordinates,
-  showDegrees,
-  degree,
-  enforceMaxDegree,
-  maxDegree,
-  onMouseDown 
-}) => {
-  const handleMouseDown = useCallback((e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    onMouseDown(e, node);
-  }, [onMouseDown, node]);
-
-  return (
-    <g 
-      onMouseDown={handleMouseDown}
-      style={{ 
-        cursor: isDragged ? 'grabbing' : 'grab',
-        pointerEvents: 'all'
-      }}
-      className={isDragged ? '' : 'transition-all duration-200'}
-    >
-      <circle
-        cx={node.x}
-        cy={node.y}
-        r={25}
-        fill={isCurrentStep ? '#EF4444' : isInPath ? '#7C3AED' : (enforceMaxDegree ? nodeColor : '#E5E7EB')}
-        stroke={isCurrentStep ? '#DC2626' : isInPath ? '#5B21B6' : '#6B7280'}
-        strokeWidth={isCurrentStep ? 4 : isInPath ? 3 : 2}
-        className="hover:stroke-slate-400"
-      />
-      <text
-        x={node.x}
-        y={node.y}
-        textAnchor="middle"
-        dy=".3em"
-        fontSize={14}
-        fontWeight="bold"
-        fill={isCurrentStep || isInPath || (enforceMaxDegree && degree > 0) ? '#FFFFFF' : '#374151'}
-        className="select-none pointer-events-none"
-      >
-        {node.id}
-      </text>
-      {showCoordinates && (
-        <text
-          x={node.x}
-          y={node.y + 40}
-          textAnchor="middle"
-          fontSize={10}
-          fill="#6B7280"
-          className="pointer-events-none select-none"
-        >
-          ({node.x.toFixed(0)}, {node.y.toFixed(0)})
-        </text>
-      )}
-      {showDegrees && (
-        <text
-          x={node.x}
-          y={node.y - 35}
-          textAnchor="middle"
-          fontSize={11}
-          fontWeight="bold"
-          fill={enforceMaxDegree && maxDegree && degree >= parseInt(maxDegree) ? '#DC2626' : '#059669'}
-          className="pointer-events-none select-none"
-        >
-          deg: {degree}
-        </text>
-      )}
-    </g>
-  );
+const getExampleGraph = () => ({
+  nodes: [
+    { id: 6, x: 110, y: 110 },
+    { id: 5, x: 220, y: 110 },
+    { id: 4, x: 330, y: 110 },
+    { id: 3, x: 440, y: 110 },
+    { id: 8, x: 560, y: 110 },
+    { id: 7, x: 110, y: 220 },
+    { id: 0, x: 220, y: 220 },
+    { id: 1, x: 330, y: 220 },
+    { id: 2, x: 440, y: 220 },
+    { id: 12, x: 110, y: 360 },
+    { id: 13, x: 220, y: 360 },
+    { id: 14, x: 330, y: 360 },
+    { id: 15, x: 500, y: 305 },
+    { id: 11, x: 500, y: 360 },
+    { id: 10, x: 620, y: 360 },
+    { id: 9, x: 620, y: 250 },
+  ],
+  edges: [
+    { from: 6, to: 5 },
+    { from: 5, to: 4 },
+    { from: 4, to: 3 },
+    { from: 3, to: 8 },
+    { from: 6, to: 7 },
+    { from: 5, to: 0 },
+    { from: 4, to: 1 },
+    { from: 3, to: 2 },
+    { from: 8, to: 9 },
+    { from: 7, to: 0 },
+    { from: 0, to: 1 },
+    { from: 1, to: 2 },
+    { from: 7, to: 12 },
+    { from: 12, to: 13 },
+    { from: 13, to: 14 },
+    { from: 14, to: 11 },
+    { from: 11, to: 10 },
+    { from: 2, to: 15 },
+    { from: 2, to: 13 },
+    { from: 15, to: 14 },
+    { from: 15, to: 9 },
+    { from: 15, to: 11 },
+    { from: 9, to: 10 },
+  ],
+  source: 6,
+  target: 10,
 });
 
-// Optimized BFS Node Component
-const BFSNode = memo(({ 
-  node, 
-  isInPath, 
-  isVisited, 
-  isCurrent, 
-  isInQueue, 
-  distance 
-}) => {
-  let nodeColor = '#E5E7EB';
-  let strokeColor = '#6B7280';
-  let strokeWidth = 2;
-  
-  if (isCurrent) {
-    nodeColor = '#EF4444';
-    strokeColor = '#DC2626';
-    strokeWidth = 4;
-  } else if (isInPath) {
-    nodeColor = '#7C3AED';
-    strokeColor = '#5B21B6';
-    strokeWidth = 3;
-  } else if (isInQueue) {
-    nodeColor = '#F59E0B';
-    strokeColor = '#D97706';
-    strokeWidth = 3;
-  } else if (isVisited) {
-    nodeColor = '#10B981';
-    strokeColor = '#059669';
-    strokeWidth = 2;
+const generateSteps = (nodes, edges, source, target) => {
+  const sourceId = Number(source);
+  const targetId = Number(target);
+
+  if (!Number.isFinite(sourceId) || !Number.isFinite(targetId)) {
+    return { steps: [], error: 'Source and target must be valid node IDs.' };
   }
 
-  return (
-    <g className="transition-all duration-300">
-      <circle
-        cx={node.x}
-        cy={node.y}
-        r={25}
-        fill={nodeColor}
-        stroke={strokeColor}
-        strokeWidth={strokeWidth}
-      />
-      <text
-        x={node.x}
-        y={node.y}
-        textAnchor="middle"
-        dy=".3em"
-        fontSize={14}
-        fontWeight="bold"
-        fill={isCurrent || isInPath || isInQueue || isVisited ? '#FFFFFF' : '#374151'}
-        className="select-none pointer-events-none"
-      >
-        {node.id}
-      </text>
-      {isVisited && distance !== undefined && (
-        <text
-          x={node.x}
-          y={node.y - 35}
-          textAnchor="middle"
-          fontSize={11}
-          fontWeight="bold"
-          fill="#059669"
-          className="pointer-events-none select-none"
-        >
-          d: {distance}
-        </text>
-      )}
-    </g>
-  );
-});
+  const ids = new Set(nodes.map((n) => n.id));
+  if (!ids.has(sourceId) || !ids.has(targetId)) {
+    return { steps: [], error: 'Source or target is missing from the graph.' };
+  }
+
+  const adj = buildAdjacency(nodes, edges);
+  const queue = [sourceId];
+  const visited = new Set([sourceId]);
+  const parent = { [sourceId]: null };
+  const distances = { [sourceId]: 0 };
+  const treeEdgeKeys = [];
+  const steps = [];
+
+  const snapshot = ({
+    action,
+    narration,
+    pseudoLine,
+    current = null,
+    newlyDiscovered = [],
+    dequeued = null,
+    enqueued = [],
+    phase = 'search',
+    pathNodes = [],
+    pathEdges = [],
+  }) => {
+    const levelMap = {};
+    Object.entries(distances).forEach(([nodeId, d]) => {
+      if (!levelMap[d]) levelMap[d] = [];
+      levelMap[d].push(Number(nodeId));
+    });
+
+    Object.keys(levelMap).forEach((lvl) => {
+      levelMap[lvl] = sortNumeric(levelMap[lvl]);
+    });
+
+    const currentLevel =
+      current !== null && distances[current] !== undefined ? distances[current] : null;
+
+    steps.push({
+      stepNumber: steps.length,
+      action,
+      narration,
+      explanation: narration,
+      pseudoLine,
+      phase,
+      current,
+      currentLevel,
+      queue: [...queue],
+      visited: sortNumeric([...visited]),
+      parent: { ...parent },
+      distances: { ...distances },
+      treeEdges: [...treeEdgeKeys],
+      newlyDiscovered: [...newlyDiscovered],
+      dequeued,
+      enqueued: [...enqueued],
+      pathNodes: [...pathNodes],
+      path: [...pathNodes],
+      pathEdges: [...pathEdges],
+      levelMap,
+    });
+  };
+
+  snapshot({
+    action: 'initialize-queue',
+    narration: 'Initialize empty queue Q.',
+    pseudoLine: 1,
+    current: null,
+  });
+
+  snapshot({
+    action: 'mark-source',
+    narration: `Mark source ${sourceId} as visited.`,
+    pseudoLine: 2,
+    current: sourceId,
+    newlyDiscovered: [sourceId],
+  });
+
+  snapshot({
+    action: 'distance-source',
+    narration: `Set distance[${sourceId}] = 0.`,
+    pseudoLine: 3,
+    current: sourceId,
+  });
+
+  snapshot({
+    action: 'enqueue-source',
+    narration: `Enqueue source ${sourceId} into Q.`,
+    pseudoLine: 4,
+    current: sourceId,
+    enqueued: [sourceId],
+  });
+
+  if (sourceId === targetId) {
+    snapshot({
+      action: 'target-found',
+      narration: `Source equals target (${sourceId}). Shortest path is length 0.`,
+      pseudoLine: 5,
+      current: sourceId,
+      phase: 'path',
+      pathNodes: [sourceId],
+      pathEdges: [],
+    });
+
+    return { steps, error: null };
+  }
+
+  while (queue.length > 0) {
+    const u = queue.shift();
+
+    snapshot({
+      action: 'dequeue',
+      narration: `Dequeued node ${u} from the front of the queue.`,
+      pseudoLine: 6,
+      current: u,
+      dequeued: u,
+    });
+
+    let discoveredAny = false;
+
+    for (const v of adj[u] || []) {
+      if (visited.has(v)) continue;
+
+      discoveredAny = true;
+      visited.add(v);
+      parent[v] = u;
+      distances[v] = distances[u] + 1;
+      queue.push(v);
+
+      const treeKey = toEdgeKey(u, v);
+      treeEdgeKeys.push(treeKey);
+
+      snapshot({
+        action: 'discover',
+        narration: `Discovered node ${v} from node ${u}. Assigned distance ${distances[v]} and parent ${u}.`,
+        pseudoLine: 12,
+        current: u,
+        newlyDiscovered: [v],
+        enqueued: [v],
+      });
+
+      if (v === targetId) {
+        const pathNodes = [];
+        let cursor = targetId;
+        while (cursor !== null) {
+          pathNodes.unshift(cursor);
+          cursor = parent[cursor];
+        }
+
+        const pathEdges = [];
+        for (let i = 0; i < pathNodes.length - 1; i += 1) {
+          pathEdges.push(toEdgeKey(pathNodes[i], pathNodes[i + 1]));
+        }
+
+        snapshot({
+          action: 'reconstruct-path',
+          narration: `Target ${targetId} found. Reconstructing shortest path from parent pointers.`,
+          pseudoLine: 5,
+          current: v,
+          phase: 'path',
+          pathNodes,
+          pathEdges,
+        });
+
+        return { steps, error: null };
+      }
+    }
+
+    if (!discoveredAny) {
+      snapshot({
+        action: 'no-new-discovery',
+        narration: `Node ${u} produced no new discoveries; continue with the remaining frontier.`,
+        pseudoLine: 7,
+        current: u,
+      });
+    }
+  }
+
+  snapshot({
+    action: 'no-path',
+    narration: `Queue exhausted. No path exists from ${sourceId} to ${targetId}.`,
+    pseudoLine: 5,
+    current: null,
+    phase: 'path',
+    pathNodes: [],
+    pathEdges: [],
+  });
+
+  return { steps, error: null };
+};
+
+const StatChip = ({ label, value }) => (
+  <div className="rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2">
+    <p className="text-[11px] uppercase tracking-wide text-slate-400">{label}</p>
+    <p className="text-sm font-semibold text-slate-100">{value}</p>
+  </div>
+);
+
+const PseudocodePanel = ({ activeLine }) => (
+  <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4 shadow-elevation-2">
+    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-300">Pseudocode</h3>
+    <div className="mt-2 max-h-72 space-y-1 overflow-y-auto pr-1 font-mono text-xs md:max-h-none">
+      {BFS_PSEUDOCODE.map((row) => {
+        const active = row.line === activeLine;
+        return (
+          <div
+            key={row.line}
+            className={`flex items-start gap-2 rounded-md px-2 py-1 transition-colors duration-200 ${
+              active
+                ? 'bg-sky-500/20 text-sky-100 ring-1 ring-sky-500/40'
+                : 'text-slate-400 hover:bg-slate-800/70'
+            }`}
+          >
+            <span className={`w-6 text-right ${active ? 'text-sky-200' : 'text-slate-500'}`}>{row.line}</span>
+            <span className="whitespace-pre-wrap">{row.text}</span>
+          </div>
+        );
+      })}
+    </div>
+  </div>
+);
+
+const StepExplanationPanel = ({ currentStep, message }) => (
+  <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4 shadow-elevation-2">
+    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-300">Current Step</h3>
+    <p className="mt-2 text-sm leading-6 text-slate-200">{currentStep?.explanation || message}</p>
+    {currentStep && (
+      <p className="mt-2 text-xs text-slate-400">
+        Action: <span className="font-semibold text-slate-300">{currentStep.action}</span>
+      </p>
+    )}
+  </div>
+);
+
+const QueuePanel = ({ queue }) => (
+  <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4 shadow-elevation-2">
+    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-300">Queue (Front → Back)</h3>
+    {queue?.length ? (
+      <div className="mt-3 flex flex-wrap gap-2 overflow-x-auto pb-1 transition-all duration-200">
+        {queue.map((id, idx) => (
+          <div
+            key={`q-${id}-${idx}`}
+            className="rounded-lg border border-amber-500/50 bg-amber-500/20 px-3 py-1.5 text-xs font-semibold text-amber-200"
+          >
+            {idx === 0 ? 'FRONT ' : ''}
+            {id}
+            {idx === queue.length - 1 ? ' BACK' : ''}
+          </div>
+        ))}
+      </div>
+    ) : (
+      <p className="mt-2 text-sm text-slate-400">Queue is empty.</p>
+    )}
+  </div>
+);
+
+const LevelsPanel = ({ currentStep }) => (
+  <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4 shadow-elevation-2">
+    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-300">Levels by Distance</h3>
+    {currentStep?.levelMap && Object.keys(currentStep.levelMap).length > 0 ? (
+      <div className="mt-2 space-y-2">
+        {Object.entries(currentStep.levelMap)
+          .sort((a, b) => Number(a[0]) - Number(b[0]))
+          .map(([lvl, ids]) => {
+            const isActive = Number(lvl) === currentStep.currentLevel;
+            return (
+              <div
+                key={`lvl-${lvl}`}
+                className={`rounded-lg border px-3 py-2 text-xs ${
+                  isActive
+                    ? 'border-sky-500/60 bg-sky-500/20 text-sky-100'
+                    : 'border-slate-700 bg-slate-800/80 text-slate-300'
+                }`}
+              >
+                Level {lvl}: [{ids.join(', ')}]
+              </div>
+            );
+          })}
+      </div>
+    ) : (
+      <p className="mt-2 text-sm text-slate-400">Run BFS to see level expansion.</p>
+    )}
+  </div>
+);
+
+const ParentPanel = ({ parent }) => (
+  <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4 shadow-elevation-2">
+    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-300">Parent Map (BFS Tree)</h3>
+    {parent && Object.keys(parent).length > 0 ? (
+      <div className="mt-2 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
+        {Object.entries(parent)
+          .sort((a, b) => Number(a[0]) - Number(b[0]))
+          .map(([child, par]) => (
+            <div key={`p-${child}`} className="rounded-md border border-slate-700 bg-slate-800/80 px-2 py-1 text-slate-200">
+              {child} ← {par === null ? 'root' : par}
+            </div>
+          ))}
+      </div>
+    ) : (
+      <p className="mt-2 text-sm text-slate-400">No tree yet.</p>
+    )}
+  </div>
+);
+
+const LegendPanel = () => (
+  <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4 shadow-elevation-2">
+    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-300">Legend</h3>
+    <div className="mt-2 grid gap-2 text-xs text-slate-300">
+      <p><span className="inline-block h-2 w-8 rounded bg-slate-600" /> Neutral graph edge</p>
+      <p><span className="inline-block h-2 w-8 rounded bg-cyan-400" /> BFS discovery/tree edge</p>
+      <p><span className="inline-block h-2 w-8 rounded bg-rose-400" /> Final shortest-path edge</p>
+      <p><span className="inline-block h-3 w-3 rounded-full bg-sky-700" /> Source node</p>
+      <p><span className="inline-block h-3 w-3 rounded-full bg-rose-800" /> Target node</p>
+      <p><span className="inline-block h-3 w-3 rounded-full bg-teal-700" /> Current node</p>
+      <p><span className="inline-block h-3 w-3 rounded-full bg-amber-700" /> Queue/frontier node</p>
+      <p><span className="inline-block h-3 w-3 rounded-full bg-blue-700" /> Visited/discovered node</p>
+      <p><span className="inline-block h-3 w-3 rounded-full bg-rose-700" /> Final path node</p>
+    </div>
+  </div>
+);
 
 export default function BFS() {
-  const [nodes, setNodes] = useState([]);
-  const [edges, setEdges] = useState([]);
-  // scrollProgress removed — decorative only
-  
-  // Input states for dropdown operations
-  const [showNodeInput, setShowNodeInput] = useState('');
-  const [showEdgeInput, setShowEdgeInput] = useState('');
-  const [showPathInput, setShowPathInput] = useState(false);
-  const [inputErrors, setInputErrors] = useState({});
-  const [tempInputs, setTempInputs] = useState({
-    bulkCount: '',
-    deleteNodeId: '',
-    edgeFrom: '',
-    edgeTo: '',
-    randomEdgeCount: '',
-    pathStart: '',
-    pathEnd: ''
-  });
-  const [start, setStart] = useState('');
-  const [end, setEnd] = useState('');
-  const [path, setPath] = useState([]);
-  const [addEdgeFrom, setAddEdgeFrom] = useState('');
-  const [addEdgeTo, setAddEdgeTo] = useState('');
-  const [deleteEdgeFrom, setDeleteEdgeFrom] = useState('');
-  const [deleteEdgeTo, setDeleteEdgeTo] = useState('');
-  const [deleteNodeId, setDeleteNodeId] = useState('');
-  const [bulkNodeCount, setBulkNodeCount] = useState('');
-  const [draggedNode, setDraggedNode] = useState(null);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const example = useMemo(() => getExampleGraph(), []);
 
-  
-  const [maxDegree, setMaxDegree] = useState('');
-  const [enforceMaxDegree, setEnforceMaxDegree] = useState(false);
-  
-  
-  // Mathematical visualization features
-  const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [isPanning, setIsPanning] = useState(false);
-  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
-  const [history, setHistory] = useState([]);
-  const [currentStep, setCurrentStep] = useState(0);
-  const [isAnimating, setIsAnimating] = useState(false);
-  const [animationPath, setAnimationPath] = useState([]);
-  const [animationIndex, setAnimationIndex] = useState(0);
-  
-  // BFS Animation specific state
-  const [bfsSteps, setBfsSteps] = useState([]);
-  const [currentBfsStep, setCurrentBfsStep] = useState(0);
-  const [isPlayingAnimation, setIsPlayingAnimation] = useState(false);
-  const [animationSpeed, setAnimationSpeed] = useState(1000); // ms
-  const [bfsQueue, setBfsQueue] = useState([]);
-  const [visitedNodes, setVisitedNodes] = useState(new Set());
-  const [currentNode, setCurrentNode] = useState(null);
-  const [distances, setDistances] = useState({});
-  
-  // Split screen zoom/pan for auxiliary graph
-  const [zoom2, setZoom2] = useState(1);
-  const [pan2, setPan2] = useState({ x: 0, y: 0 });
-  const [isPanning2, setIsPanning2] = useState(false);
-  const [panStart2, setPanStart2] = useState({ x: 0, y: 0 });
-  const [showCoordinates, setShowCoordinates] = useState(false);
-  const [showDistance, setShowDistance] = useState(false);
-  const [algorithmInfo, setAlgorithmInfo] = useState('');
-  const [autoEdgeCount, setAutoEdgeCount] = useState('');
-  const [nodeColors, setNodeColors] = useState({});
-  const [showDegrees, setShowDegrees] = useState(false);
-  const width = 800;
-  const height = 500;
+  const [nodes, setNodes] = useState(example.nodes);
+  const [edges, setEdges] = useState(example.edges);
+  const [source, setSource] = useState(example.source);
+  const [target, setTarget] = useState(example.target);
+  const [edgeFrom, setEdgeFrom] = useState('');
+  const [edgeTo, setEdgeTo] = useState('');
+  const [bulkNodeCount, setBulkNodeCount] = useState('5');
+  const [randomEdgeCount, setRandomEdgeCount] = useState('6');
+  const [removeNodeId, setRemoveNodeId] = useState('');
+  const [removeEdgeFrom, setRemoveEdgeFrom] = useState('');
+  const [removeEdgeTo, setRemoveEdgeTo] = useState('');
+  const [autoConnectNewNodes, setAutoConnectNewNodes] = useState(true);
+  const [steps, setSteps] = useState([]);
+  const [stepIndex, setStepIndex] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [speedMs, setSpeedMs] = useState(850);
+  const [message, setMessage] = useState('Load a graph, choose source/target, then start BFS.');
+
+  const [draggingId, setDraggingId] = useState(null);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const svgRef = useRef(null);
 
-   // Calculate degree of a node
-   const getNodeDegree = useCallback((nodeId) => {
-    return edges.filter(e => e.from === nodeId || e.to === nodeId).length;
-  }, [edges]);
-
-  // Get all node degrees
-  const getNodeDegrees = () => {
-    const degrees = {};
-    nodes.forEach(node => {
-      degrees[node.id] = getNodeDegree(node.id);
+  const nodeMap = useMemo(() => {
+    const map = {};
+    nodes.forEach((n) => {
+      map[n.id] = n;
     });
-    return degrees;
-  };
+    return map;
+  }, [nodes]);
 
+  const edgeKeys = useMemo(() => new Set(edges.map((e) => toEdgeKey(e.from, e.to))), [edges]);
 
-  // Color nodes based on degree (for visualization)
-  const colorNodesByDegree = useCallback(() => {
-    if (!enforceMaxDegree || !maxDegree) {
-      setNodeColors({});
+  const currentStep = steps[stepIndex] || null;
+  const pathLength = currentStep?.pathNodes?.length ? currentStep.pathNodes.length - 1 : null;
+
+  const allIds = useMemo(() => sortNumeric(nodes.map((n) => n.id)), [nodes]);
+
+  useEffect(() => {
+    if (!isPlaying || steps.length === 0 || stepIndex >= steps.length - 1) return undefined;
+
+    const timer = setInterval(() => {
+      setStepIndex((prev) => {
+        if (prev >= steps.length - 1) {
+          setIsPlaying(false);
+          return prev;
+        }
+        return prev + 1;
+      });
+    }, speedMs);
+
+    return () => clearInterval(timer);
+  }, [isPlaying, speedMs, stepIndex, steps.length]);
+
+  useEffect(() => {
+    if (!currentStep) return;
+    setMessage(currentStep.narration);
+    if (stepIndex >= steps.length - 1) {
+      setIsPlaying(false);
+    }
+  }, [currentStep, stepIndex, steps.length]);
+
+  useEffect(() => {
+    if (nodes.length === 0) {
+      setSource('');
+      setTarget('');
       return;
     }
-    
-    const colors = ['#10B981', '#3B82F6', '#8B5CF6', '#EC4899', '#F59E0B', '#EF4444'];
-    const newColors = {};
-    
-    nodes.forEach(node => {
-      const degree = getNodeDegree(node.id);
-      const colorIndex = Math.min(degree, colors.length - 1);
-      newColors[node.id] = colors[colorIndex];
-    });
-    
-    setNodeColors(newColors);
-  }, [enforceMaxDegree, maxDegree, nodes, getNodeDegree]);
 
-  // Update colors when edges or max degree changes
-  useEffect(() => {
-    colorNodesByDegree();
-  }, [colorNodesByDegree]);
+    const ids = new Set(nodes.map((n) => n.id));
+    const sorted = sortNumeric([...ids]);
 
-
-  // History management for mathematical operations
-  const saveToHistory = (newNodes, newEdges, operation = '') => {
-    const timestamp = Date.now();
-    setHistory(prev => [...prev.slice(0, currentStep), { 
-      nodes: newNodes, 
-      edges: newEdges, 
-      operation,
-      timestamp 
-    }]);
-    setCurrentStep(prev => prev + 1);
-  };
-
-  const undo = () => {
-    if (currentStep > 0) {
-      const newStep = currentStep - 1;
-      const previousState = history[newStep - 1] || { nodes: [], edges: [] };
-      setNodes(previousState.nodes);
-      setEdges(previousState.edges);
-      setCurrentStep(newStep);
-      setPath([]);
-      setAlgorithmInfo(`Undone: ${previousState.operation || 'Previous operation'}`);
+    if (!ids.has(Number(source))) {
+      setSource(sorted[0]);
     }
-  };
-
-  const redo = () => {
-    if (currentStep < history.length) {
-      const nextState = history[currentStep];
-      setNodes(nextState.nodes);
-      setEdges(nextState.edges);
-      setCurrentStep(prev => prev + 1);
-      setPath([]);
-      setAlgorithmInfo(`Redone: ${nextState.operation || 'Next operation'}`);
+    if (!ids.has(Number(target))) {
+      setTarget(sorted[sorted.length - 1]);
     }
+  }, [nodes, source, target]);
+
+  const resetTraversalState = () => {
+    setSteps([]);
+    setStepIndex(0);
+    setIsPlaying(false);
   };
 
   const addNode = () => {
-    const id = nodes.length > 0 ? Math.max(...nodes.map(n => n.id)) + 1 : 1;
-    const nodeRadius = 25;
-    const minDistance = nodeRadius * 2 + 10;
-    
-    let x, y;
+    const nextId = nodes.length ? Math.max(...nodes.map((n) => n.id)) + 1 : 1;
+
+    let x = 80;
+    let y = 80;
     let attempts = 0;
-    const maxAttempts = 100;
-    
-    let hasCollision = true;
-    while (attempts < maxAttempts && hasCollision) {
-      const candidateX = Math.random() * (width - 80) + 40;
-      const candidateY = Math.random() * (height - 80) + 40;
-      attempts++;
-      hasCollision = false;
 
-      for (const node of nodes) {
-        const distance = Math.hypot(candidateX - node.x, candidateY - node.y);
-        if (distance < minDistance) {
-          hasCollision = true;
-          break;
-        }
-      }
+    while (attempts < 160) {
+      const candidateX = Math.round(Math.random() * (SVG_WIDTH - 140) + 70);
+      const candidateY = Math.round(Math.random() * (SVG_HEIGHT - 140) + 70);
 
-      x = candidateX;
-      y = candidateY;
-    }
-    
-    const newNodes = [...nodes, { id, x, y }];
-    setNodes(newNodes);
-    saveToHistory(newNodes, edges, `Added node ${id}`);
-  };
+      const overlaps = nodes.some((n) => {
+        const dx = n.x - candidateX;
+        const dy = n.y - candidateY;
+        return Math.hypot(dx, dy) < NODE_RADIUS * 2.5;
+      });
 
-  const addBulkNodes = (nodeCount = bulkNodeCount) => {
-    const count = parseInt(nodeCount);
-    if (isNaN(count) || count <= 0 || count > 50) {
-      return; // Validation is handled in the UI
-    }
-
-    const newNodes = [];
-    const nodeRadius = 25;
-    const minDistance = nodeRadius * 2 + 10;
-    const startId = nodes.length > 0 ? Math.max(...nodes.map(n => n.id)) + 1 : 1;
-    const allExistingNodes = [...nodes];
-
-    for (let i = 0; i < count; i++) {
-      const id = startId + i;
-      let x, y;
-      let attempts = 0;
-      const maxAttempts = 200;
-      const occupiedNodes = [...allExistingNodes, ...newNodes];
-      
-      let hasCollision = true;
-      while (attempts < maxAttempts && hasCollision) {
-        const candidateX = Math.random() * (width - 80) + 40;
-        const candidateY = Math.random() * (height - 80) + 40;
-        attempts++;
-        hasCollision = false;
-
-        for (const node of occupiedNodes) {
-          const distance = Math.hypot(candidateX - node.x, candidateY - node.y);
-          if (distance < minDistance) {
-            hasCollision = true;
-            break;
-          }
-        }
-
+      if (!overlaps) {
         x = candidateX;
         y = candidateY;
-      }
-      
-      newNodes.push({ id, x, y });
-    }
-
-    const finalNodes = [...nodes, ...newNodes];
-    setNodes(finalNodes);
-    setBulkNodeCount('');
-    saveToHistory(finalNodes, edges, `Added ${count} nodes (${startId}-${startId + count - 1})`);
-  };
-
-  const deleteNode = () => {
-    const id = parseInt(deleteNodeId);
-    if (isNaN(id)) return;
-    const newNodes = nodes.filter(n => n.id !== id);
-    const newEdges = edges.filter(e => e.from !== id && e.to !== id);
-    setNodes(newNodes);
-    setEdges(newEdges);
-    setDeleteNodeId('');
-    saveToHistory(newNodes, newEdges, `Deleted node ${id}`);
-  };
-
-  const addEdge = (fromNodeId = addEdgeFrom, toNodeId = addEdgeTo) => {
-    const fromId = parseInt(fromNodeId);
-    const toId = parseInt(toNodeId);
-    if (isNaN(fromId) || isNaN(toId) || fromId === toId) return false;
-    
-    // Check if nodes exist
-    const fromNode = nodes.find(n => n.id === fromId);
-    const toNode = nodes.find(n => n.id === toId);
-    if (!fromNode || !toNode) {
-      setInputErrors(prev => ({ ...prev, edge: 'One or both nodes do not exist!' }));
-      return false;
-    }
-    
-    // Check if edge already exists
-    const edgeExists = edges.some(e => 
-      (e.from === fromId && e.to === toId) || (e.from === toId && e.to === fromId)
-    );
-    
-    if (edgeExists) {
-      setInputErrors(prev => ({ ...prev, edge: 'Edge already exists!' }));
-      return false;
-    }
-    
-    // Check max degree constraint
-    if (enforceMaxDegree && maxDegree) {
-      const maxDeg = parseInt(maxDegree);
-      const fromDegree = getNodeDegree(fromId);
-      const toDegree = getNodeDegree(toId);
-      
-      if (fromDegree >= maxDeg) {
-        setInputErrors(prev => ({ ...prev, edge: `Cannot add edge: Node ${fromId} already has maximum degree of ${maxDeg}` }));
-        return false;
-      }
-      if (toDegree >= maxDeg) {
-        setInputErrors(prev => ({ ...prev, edge: `Cannot add edge: Node ${toId} already has maximum degree of ${maxDeg}` }));
-        return false;
-      }
-    }
-    
-    const newEdges = [...edges, { from: fromId, to: toId }];
-    setEdges(newEdges);
-    saveToHistory(nodes, newEdges, `Added edge ${fromId} → ${toId}`);
-    setAddEdgeFrom('');
-    setAddEdgeTo('');
-    return true;
-  };
-
-  const deleteEdge = () => {
-    const fromId = parseInt(deleteEdgeFrom);
-    const toId = parseInt(deleteEdgeTo);
-    if (isNaN(fromId) || isNaN(toId)) return;
-    const newEdges = edges.filter(e => 
-      !((e.from === fromId && e.to === toId) || (e.from === toId && e.to === fromId))
-    );
-    setEdges(newEdges);
-    setDeleteEdgeFrom('');
-    setDeleteEdgeTo('');
-    saveToHistory(nodes, newEdges, `Deleted edge ${fromId} ↔ ${toId}`);
-  };
-
-  // Enhanced BFS with step-by-step tracking
-  const computeBFS = (startNode = start, endNode = end) => {
-    if (!startNode || !endNode) return false;
-    
-    const startId = parseInt(startNode);
-    const endId = parseInt(endNode);
-    
-    const startNodeObj = nodes.find(n => n.id === startId);
-    const endNodeObj = nodes.find(n => n.id === endId);
-    
-    if (!startNodeObj || !endNodeObj) {
-      setInputErrors(prev => ({ ...prev, path: 'Start or end node does not exist!' }));
-      return false;
-    }
-    
-    // Build adjacency list
-    const adj = {};
-    nodes.forEach(n => { adj[n.id] = []; });
-    
-    edges.forEach(({ from, to }) => {
-      if (adj[from] && adj[to]) {
-        adj[from].push(to);
-        adj[to].push(from);
-      }
-    });
-    
-    // Run BFS with step tracking
-    const steps = [];
-    const queue = [startId];
-    const visited = new Set([startId]);
-    const parent = {};
-    const dist = { [startId]: 0 };
-    
-    steps.push({
-      step: 0,
-      action: 'initialize',
-      description: `Initialize BFS with start node ${startId}`,
-      queue: [...queue],
-      visited: new Set(visited),
-      current: startId,
-      neighbors: [],
-      parent: {...parent},
-      distances: {...dist},
-      pathFound: false,
-      finalPath: []
-    });
-    
-    let stepCount = 1;
-    let pathFound = false;
-    let finalPath = [];
-    
-    while (queue.length > 0 && !pathFound) {
-      const current = queue.shift();
-      
-      steps.push({
-        step: stepCount++,
-        action: 'dequeue',
-        description: `Dequeue node ${current} from front of queue`,
-        queue: [...queue],
-        visited: new Set(visited),
-        current,
-        neighbors: [],
-        parent: {...parent},
-        distances: {...dist},
-        pathFound: false,
-        finalPath: []
-      });
-      
-      if (current === endId) {
-        // Reconstruct path
-        const path = [];
-        let node = endId;
-        while (node !== undefined) {
-          path.unshift(node);
-          node = parent[node];
-        }
-        finalPath = path;
-        pathFound = true;
-        
-        steps.push({
-          step: stepCount++,
-          action: 'found',
-          description: `Target node ${endId} found! Reconstructing path...`,
-          queue: [...queue],
-          visited: new Set(visited),
-          current,
-          neighbors: [],
-          parent: {...parent},
-          distances: {...dist},
-          pathFound: true,
-          finalPath: [...finalPath]
-        });
         break;
       }
-      
-      const neighbors = adj[current] || [];
-      const newNeighbors = [];
-      
-      for (const neighbor of neighbors) {
-        if (!visited.has(neighbor)) {
-          visited.add(neighbor);
-          queue.push(neighbor);
-          parent[neighbor] = current;
-          dist[neighbor] = dist[current] + 1;
-          newNeighbors.push(neighbor);
-        }
-      }
-      
-      if (newNeighbors.length > 0) {
-        steps.push({
-          step: stepCount++,
-          action: 'explore',
-          description: `Exploring neighbors of ${current}: [${neighbors.join(', ')}]. Adding unvisited: [${newNeighbors.join(', ')}]`,
-          queue: [...queue],
-          visited: new Set(visited),
-          current,
-          neighbors: newNeighbors,
-          parent: {...parent},
-          distances: {...dist},
-          pathFound: false,
-          finalPath: []
-        });
-    } else {
-        steps.push({
-          step: stepCount++,
-          action: 'no_neighbors',
-          description: `Node ${current} has no unvisited neighbors`,
-          queue: [...queue],
-          visited: new Set(visited),
-          current,
-          neighbors: [],
-          parent: {...parent},
-          distances: {...dist},
-          pathFound: false,
-          finalPath: []
-        });
+
+      attempts += 1;
+    }
+
+    const newNode = { id: nextId, x, y };
+    const updatedNodes = [...nodes, newNode];
+    let nextEdges = [...edges];
+    let attached = 0;
+
+    if (autoConnectNewNodes && nodes.length > 0) {
+      const candidates = shuffle(nodes.map((n) => n.id));
+      const picked = candidates[0];
+      const key = toEdgeKey(nextId, picked);
+      if (!edgeKeys.has(key)) {
+        nextEdges.push({ from: nextId, to: picked });
+        attached = 1;
       }
     }
-    
-    if (!pathFound) {
-      steps.push({
-        step: stepCount++,
-        action: 'not_found',
-        description: `Queue is empty. No path exists from ${startId} to ${endId}`,
-        queue: [],
-        visited: new Set(visited),
-        current: null,
-        neighbors: [],
-        parent: {...parent},
-        distances: {...dist},
-        pathFound: false,
-        finalPath: []
+
+    setNodes(updatedNodes);
+    setEdges(nextEdges);
+    resetTraversalState();
+    setMessage(
+      attached > 0
+        ? `Added node ${nextId} and connected it to node ${nextEdges[nextEdges.length - 1].to}.`
+        : `Added node ${nextId}.`
+    );
+  };
+
+  const addBulkNodes = () => {
+    const count = Number(bulkNodeCount);
+    if (!Number.isInteger(count) || count < 1 || count > 50) {
+      setMessage('Bulk add expects an integer between 1 and 50.');
+      return;
+    }
+
+    const nextIdStart = nodes.length ? Math.max(...nodes.map((n) => n.id)) + 1 : 1;
+    const added = [];
+
+    for (let i = 0; i < count; i += 1) {
+      let x = 80;
+      let y = 80;
+      let attempts = 0;
+
+      while (attempts < 180) {
+        const candidateX = Math.round(Math.random() * (SVG_WIDTH - 140) + 70);
+        const candidateY = Math.round(Math.random() * (SVG_HEIGHT - 140) + 70);
+
+        const overlaps = [...nodes, ...added].some((n) => {
+          const dx = n.x - candidateX;
+          const dy = n.y - candidateY;
+          return Math.hypot(dx, dy) < NODE_RADIUS * 2.4;
+        });
+
+        if (!overlaps) {
+          x = candidateX;
+          y = candidateY;
+          break;
+        }
+        attempts += 1;
+      }
+
+      added.push({ id: nextIdStart + i, x, y });
+    }
+
+    const updatedNodes = [...nodes, ...added];
+    let nextEdges = [...edges];
+    let attachedCount = 0;
+
+    if (autoConnectNewNodes && updatedNodes.length > 1) {
+      const used = new Set(nextEdges.map((e) => toEdgeKey(e.from, e.to)));
+      added.forEach((newNode, idx) => {
+        const pool = shuffle(
+          updatedNodes
+            .filter((n) => n.id !== newNode.id)
+            .map((n) => n.id)
+        );
+        const desired = pool.length > 3 ? 2 : 1;
+        let made = 0;
+
+        for (let i = 0; i < pool.length && made < desired; i += 1) {
+          const candidate = pool[i];
+          const key = toEdgeKey(newNode.id, candidate);
+          if (used.has(key)) continue;
+          used.add(key);
+          nextEdges.push({ from: newNode.id, to: candidate });
+          made += 1;
+          attachedCount += 1;
+        }
+
+        if (idx === 0 && made === 0 && nodes.length > 0) {
+          const fallback = nodes[0].id;
+          const key = toEdgeKey(newNode.id, fallback);
+          if (!used.has(key)) {
+            used.add(key);
+            nextEdges.push({ from: newNode.id, to: fallback });
+            attachedCount += 1;
+          }
+        }
       });
     }
-    
-    setBfsSteps(steps);
-    setCurrentBfsStep(0);
-    setIsAnimating(true);
-    
-    // Set initial state
-    const firstStep = steps[0];
-    setBfsQueue(firstStep.queue);
-    setVisitedNodes(firstStep.visited);
-    setCurrentNode(firstStep.current);
-    setDistances(firstStep.distances);
-    setPath(firstStep.finalPath);
-    
-    setAlgorithmInfo(firstStep.description);
-    
-    return true;
+
+    setNodes(updatedNodes);
+    setEdges(nextEdges);
+    resetTraversalState();
+    setMessage(
+      attachedCount > 0
+        ? `Added ${added.length} nodes (${added[0].id}..${added[added.length - 1].id}) with ${attachedCount} random connecting edge(s).`
+        : `Added ${added.length} nodes (${added[0].id}..${added[added.length - 1].id}).`
+    );
   };
 
-  // Legacy compute function for compatibility
-  const compute = computeBFS;
+  const addEdge = () => {
+    const from = Number(edgeFrom);
+    const to = Number(edgeTo);
 
-  // BFS Animation Controls
-  const nextBfsStep = () => {
-    if (currentBfsStep < bfsSteps.length - 1) {
-      const newStep = currentBfsStep + 1;
-      setCurrentBfsStep(newStep);
-      updateBfsState(bfsSteps[newStep]);
+    if (!Number.isFinite(from) || !Number.isFinite(to) || from === to) {
+      setMessage('Enter valid and distinct node IDs for the edge.');
+      return;
     }
-  };
 
-  const prevBfsStep = () => {
-    if (currentBfsStep > 0) {
-      const newStep = currentBfsStep - 1;
-      setCurrentBfsStep(newStep);
-      updateBfsState(bfsSteps[newStep]);
+    if (!nodeMap[from] || !nodeMap[to]) {
+      setMessage('Cannot add edge: one or both nodes are missing.');
+      return;
     }
-  };
 
-  const updateBfsState = (step) => {
-    setBfsQueue(step.queue);
-    setVisitedNodes(step.visited);
-    setCurrentNode(step.current);
-    setDistances(step.distances);
-    setPath(step.finalPath);
-    setAlgorithmInfo(step.description);
-  };
-
-  const playAnimation = () => {
-    setIsPlayingAnimation(true);
-  };
-
-  const pauseAnimation = () => {
-    setIsPlayingAnimation(false);
-  };
-
-  const resetAnimation = () => {
-    setIsPlayingAnimation(false);
-    setCurrentBfsStep(0);
-    if (bfsSteps.length > 0) {
-      updateBfsState(bfsSteps[0]);
+    const key = toEdgeKey(from, to);
+    if (edgeKeys.has(key)) {
+      setMessage(`Edge (${from}, ${to}) already exists.`);
+      return;
     }
+
+    setEdges((prev) => [...prev, { from, to }]);
+    resetTraversalState();
+    setEdgeFrom('');
+    setEdgeTo('');
+    setMessage(`Added edge (${from}, ${to}).`);
   };
-
-  const goToStep = (stepIndex) => {
-    if (stepIndex >= 0 && stepIndex < bfsSteps.length) {
-      setCurrentBfsStep(stepIndex);
-      updateBfsState(bfsSteps[stepIndex]);
-    }
-  };
-
-  // Auto-play animation
-  React.useEffect(() => {
-    let interval;
-    if (isPlayingAnimation && isAnimating && currentBfsStep < bfsSteps.length - 1) {
-      interval = setInterval(() => {
-        setCurrentBfsStep(prev => {
-          const newStep = prev + 1;
-          if (newStep < bfsSteps.length) {
-            updateBfsState(bfsSteps[newStep]);
-            return newStep;
-          } else {
-            setIsPlayingAnimation(false);
-            return prev;
-          }
-        });
-      }, animationSpeed);
-    }
-    return () => clearInterval(interval);
-  }, [isPlayingAnimation, isAnimating, currentBfsStep, bfsSteps, animationSpeed]);
-
-
-  // scroll progress tracking removed — decorative only
 
   const clearGraph = () => {
     setNodes([]);
     setEdges([]);
-    setPath([]);
-    setStart('');
-    setEnd('');
-    setAddEdgeFrom('');
-    setAddEdgeTo('');
-    setDeleteEdgeFrom('');
-    setDeleteEdgeTo('');
-    setDeleteNodeId('');
-    setBulkNodeCount('');
-    setAutoEdgeCount('');
-    setDraggedNode(null);
-    setHistory([]);
-    setCurrentStep(0);
-    setIsAnimating(false);
-    setAnimationPath([]);
-    setAnimationIndex(0);
-    
-    // Clear BFS animation state
-    setBfsSteps([]);
-    setCurrentBfsStep(0);
-    setIsPlayingAnimation(false);
-    setBfsQueue([]);
-    setVisitedNodes(new Set());
-    setCurrentNode(null);
-    setDistances({});
-    
-    setAlgorithmInfo('Graph cleared');
+    setEdgeFrom('');
+    setEdgeTo('');
+    setRemoveNodeId('');
+    setRemoveEdgeFrom('');
+    setRemoveEdgeTo('');
+    resetTraversalState();
+    setMessage('Graph cleared.');
   };
 
-  // Auto-generate random edges
-  const generateRandomEdges = (edgeCount = autoEdgeCount) => {
+  const loadExample = () => {
+    const ex = getExampleGraph();
+    setNodes(ex.nodes);
+    setEdges(ex.edges);
+    setSource(ex.source);
+    setTarget(ex.target);
+    resetTraversalState();
+    setMessage('Loaded example graph (deterministic traversal).');
+  };
+
+  const addRandomEdges = () => {
     if (nodes.length < 2) {
-      setInputErrors(prev => ({ ...prev, edge: 'Need at least 2 nodes to create edges' }));
-      return false;
-    }
-
-    const count = parseInt(edgeCount);
-    if (isNaN(count) || count <= 0) {
-      setInputErrors(prev => ({ ...prev, edge: 'Please enter a valid number of edges' }));
-      return false;
-    }
-
-    const newEdges = [...edges];
-    const maxPossibleEdges = (nodes.length * (nodes.length - 1)) / 2;
-    let edgesToAdd = Math.min(count, maxPossibleEdges - edges.length);
-
-    if (edgesToAdd <= 0) {
-      setAlgorithmInfo('Graph is already complete or too many edges requested');
+      setMessage('Need at least 2 nodes to generate random edges.');
       return;
     }
 
+    const requestCount = Number(randomEdgeCount);
+    if (!Number.isInteger(requestCount) || requestCount < 1) {
+      setMessage('Random edge count must be a positive integer.');
+      return;
+    }
+
+    const maxPossible = (nodes.length * (nodes.length - 1)) / 2;
+    const available = maxPossible - edges.length;
+    if (available <= 0) {
+      setMessage('Graph already has all possible undirected edges.');
+      return;
+    }
+
+    const toAdd = Math.min(requestCount, available);
+    const existing = new Set(edges.map((e) => toEdgeKey(e.from, e.to)));
+    const nextEdges = [...edges];
+    let added = 0;
     let attempts = 0;
-    const maxAttempts = edgesToAdd * 20;
-    let addedCount = 0;
+    const maxAttempts = toAdd * 40;
 
-    while (addedCount < edgesToAdd && attempts < maxAttempts) {
-      const fromIndex = Math.floor(Math.random() * nodes.length);
-      const toIndex = Math.floor(Math.random() * nodes.length);
-      
-      if (fromIndex !== toIndex) {
-        const fromId = nodes[fromIndex].id;
-        const toId = nodes[toIndex].id;
-        
-        const edgeExists = newEdges.some(e => 
-          (e.from === fromId && e.to === toId) || (e.from === toId && e.to === fromId)
-        );
-        
-        if (!edgeExists) {
-          // Check max degree constraint
-          if (enforceMaxDegree && maxDegree) {
-            const maxDeg = parseInt(maxDegree);
-            const fromDegree = newEdges.filter(e => e.from === fromId || e.to === fromId).length;
-            const toDegree = newEdges.filter(e => e.from === toId || e.to === toId).length;
-            
-            if (fromDegree < maxDeg && toDegree < maxDeg) {
-              newEdges.push({ from: fromId, to: toId });
-              addedCount++;
-            }
-          } else {
-            newEdges.push({ from: fromId, to: toId });
-            addedCount++;
-          }
-        }
-      }
-      attempts++;
+    while (added < toAdd && attempts < maxAttempts) {
+      const a = nodes[Math.floor(Math.random() * nodes.length)].id;
+      const b = nodes[Math.floor(Math.random() * nodes.length)].id;
+      attempts += 1;
+      if (a === b) continue;
+
+      const key = toEdgeKey(a, b);
+      if (existing.has(key)) continue;
+
+      existing.add(key);
+      nextEdges.push({ from: a, to: b });
+      added += 1;
     }
 
-    setEdges(newEdges);
-    setAutoEdgeCount('');
-    saveToHistory(nodes, newEdges, `Generated ${addedCount} random edges`);
-    const constraintMsg = enforceMaxDegree ? ` (respecting max degree ${maxDegree})` : '';
-    setAlgorithmInfo(`Added ${addedCount} random edges${constraintMsg}`);
-    return true;
+    setEdges(nextEdges);
+    resetTraversalState();
+    setMessage(`Added ${added} random edges (${requestCount} requested).`);
   };
 
-  // Create complete graph (all nodes connected to all others)
-  const createCompleteGraph = () => {
-    if (nodes.length < 2) {
-      setAlgorithmInfo('Need at least 2 nodes to create a complete graph');
+  const removeNode = () => {
+    const id = Number(removeNodeId);
+    if (!Number.isFinite(id)) {
+      setMessage('Provide a valid node ID to remove.');
       return;
     }
 
-    if (enforceMaxDegree && maxDegree) {
-      const maxDeg = parseInt(maxDegree);
-      if (maxDeg < nodes.length - 1) {
-        setAlgorithmInfo(`Cannot create complete graph: Maximum degree ${maxDeg} is less than required ${nodes.length - 1}`);
-        return;
-      }
-    }
-
-    const newEdges = [];
-    
-    for (let i = 0; i < nodes.length; i++) {
-      for (let j = i + 1; j < nodes.length; j++) {
-        newEdges.push({ from: nodes[i].id, to: nodes[j].id });
-      }
-    }
-
-    setEdges(newEdges);
-    saveToHistory(nodes, newEdges, `Created complete graph with ${newEdges.length} edges`);
-    setAlgorithmInfo(`Created complete graph with ${newEdges.length} edges`);
-  };
-
-  // Create a cycle graph
-  const createCycleGraph = () => {
-    if (nodes.length < 3) {
-      setAlgorithmInfo('Need at least 3 nodes to create a cycle');
+    if (!nodeMap[id]) {
+      setMessage(`Node ${id} does not exist.`);
       return;
     }
 
-    if (enforceMaxDegree && maxDegree) {
-      const maxDeg = parseInt(maxDegree);
-      if (maxDeg < 2) {
-        setAlgorithmInfo(`Cannot create cycle graph: Maximum degree ${maxDeg} is less than required 2`);
-        return;
-      }
-    }
-
-    const newEdges = [];
-    
-    for (let i = 0; i < nodes.length; i++) {
-      const nextIndex = (i + 1) % nodes.length;
-      newEdges.push({ from: nodes[i].id, to: nodes[nextIndex].id });
-    }
-
-    setEdges(newEdges);
-    saveToHistory(nodes, newEdges, `Created cycle graph with ${newEdges.length} edges`);
-    setAlgorithmInfo(`Created cycle graph with ${newEdges.length} edges`);
+    setNodes((prev) => prev.filter((n) => n.id !== id));
+    setEdges((prev) => prev.filter((e) => e.from !== id && e.to !== id));
+    resetTraversalState();
+    setRemoveNodeId('');
+    setMessage(`Removed node ${id} and its incident edges.`);
   };
 
-
-  // Create a star graph (one central node connected to all others)
-  const createStarGraph = () => {
-    if (nodes.length < 2) {
-      setAlgorithmInfo('Need at least 2 nodes to create a star graph');
+  const removeEdge = () => {
+    const from = Number(removeEdgeFrom);
+    const to = Number(removeEdgeTo);
+    if (!Number.isFinite(from) || !Number.isFinite(to) || from === to) {
+      setMessage('Enter distinct endpoint IDs to remove an edge.');
       return;
     }
 
-    if (enforceMaxDegree && maxDegree) {
-      const maxDeg = parseInt(maxDegree);
-      if (maxDeg < nodes.length - 1) {
-        setAlgorithmInfo(`Cannot create star graph: Maximum degree ${maxDeg} is less than required ${nodes.length - 1} for center node`);
-        return;
-      }
+    const key = toEdgeKey(from, to);
+    if (!edgeKeys.has(key)) {
+      setMessage(`Edge (${from}, ${to}) does not exist.`);
+      return;
     }
 
-    const newEdges = [];
-    const centerNode = nodes[0].id;
-    
-    for (let i = 1; i < nodes.length; i++) {
-      newEdges.push({ from: centerNode, to: nodes[i].id });
+    setEdges((prev) =>
+      prev.filter((e) => !(toEdgeKey(e.from, e.to) === key))
+    );
+    resetTraversalState();
+    setRemoveEdgeFrom('');
+    setRemoveEdgeTo('');
+    setMessage(`Removed edge (${from}, ${to}).`);
+  };
+
+  const randomizeGraph = () => {
+    const count = 10;
+    const randomNodes = [];
+
+    for (let i = 1; i <= count; i += 1) {
+      randomNodes.push({
+        id: i,
+        x: Math.round(Math.random() * (SVG_WIDTH - 160) + 80),
+        y: Math.round(Math.random() * (SVG_HEIGHT - 180) + 90),
+      });
     }
 
-    setEdges(newEdges);
-    saveToHistory(nodes, newEdges, `Created star graph with ${newEdges.length} edges`);
-    setAlgorithmInfo(`Created star graph with ${newEdges.length} edges (center: node ${centerNode})`);
-  };
+    const keys = new Set();
+    const randomEdges = [];
+    const edgeBudget = 14;
 
-  // Create the example grid graph from the image
-  const createExampleGraph = () => {
-    // Clear existing graph
-    const exampleNodes = [
-      // Top row
-      { id: 6, x: 100, y: 100 },
-      { id: 5, x: 200, y: 100 },
-      { id: 4, x: 300, y: 100 },
-      { id: 3, x: 400, y: 100 },
-      { id: 8, x: 500, y: 100 },
-      
-      // Middle row
-      { id: 7, x: 100, y: 200 },
-      { id: 0, x: 200, y: 200 },
-      { id: 1, x: 300, y: 200 },
-      { id: 2, x: 400, y: 200 },
-      
-      // Bottom section
-      { id: 12, x: 100, y: 350 },
-      { id: 13, x: 200, y: 350 },
-      { id: 14, x: 300, y: 350 },
-      { id: 15, x: 450, y: 280 },
-      { id: 11, x: 450, y: 350 },
-      { id: 10, x: 550, y: 350 },
-      { id: 9, x: 550, y: 280 }
-    ];
-
-    const exampleEdges = [
-      // Top row horizontal connections
-      { from: 6, to: 5 },
-      { from: 5, to: 4 },
-      { from: 4, to: 3 },
-      { from: 3, to: 8 },
-      
-      // Vertical connections from top to middle
-      { from: 6, to: 7 },
-      { from: 5, to: 0 },
-      { from: 4, to: 1 },
-      { from: 3, to: 2 },
-      { from: 8, to: 9 },
-      
-      // Middle row horizontal connections
-      { from: 7, to: 0 },
-      { from: 0, to: 1 },
-      { from: 1, to: 2 },
-      
-      // Vertical connections from middle to bottom
-      { from: 7, to: 12 },
-      
-      // Bottom row horizontal connections
-      { from: 12, to: 13 },
-      { from: 13, to: 14 },
-      { from: 14, to: 11 },
-      { from: 11, to: 10 },
-      
-      // Diagonal and special connections
-      { from: 2, to: 15 },
-      { from: 2, to: 13 },
-      { from: 15, to: 14 },
-      { from: 15, to: 9 },
-      { from: 15, to: 11 },
-      { from: 9, to: 10 }
-    ];
-
-    setNodes(exampleNodes);
-    setEdges(exampleEdges);
-    saveToHistory(exampleNodes, exampleEdges, 'Created example grid graph');
-    setAlgorithmInfo('Loaded example graph - try BFS from node 6 to node 10!');
-    
-    // Set suggested start and end points
-    setStart('6');
-    setEnd('10');
-  };
-
-  // Mathematical zoom and pan
-  const handleZoom = (delta) => {
-    setZoom(prev => Math.max(0.3, Math.min(5, prev + delta)));
-  };
-
-  const handleWheel = (e) => {
-    // Only zoom when hovering over the main SVG graph area
-    if (e.target.closest('#main-svg')) {
-      e.preventDefault();
-      const delta = e.deltaY > 0 ? -0.1 : 0.1;
-      handleZoom(delta);
+    while (randomEdges.length < edgeBudget) {
+      const a = randomNodes[Math.floor(Math.random() * randomNodes.length)].id;
+      const b = randomNodes[Math.floor(Math.random() * randomNodes.length)].id;
+      if (a === b) continue;
+      const key = toEdgeKey(a, b);
+      if (keys.has(key)) continue;
+      keys.add(key);
+      randomEdges.push({ from: a, to: b });
     }
+
+    setNodes(randomNodes);
+    setEdges(randomEdges);
+    setSource(1);
+    setTarget(10);
+    resetTraversalState();
+    setMessage('Generated a random graph with guarded undirected edges.');
   };
 
-  // Auxiliary graph zoom and pan
-  const handleZoom2 = (delta) => {
-    setZoom2(prev => Math.max(0.3, Math.min(5, prev + delta)));
-  };
-
-  const handleWheel2 = (e) => {
-    if (e.target.closest('#aux-svg')) {
-      e.preventDefault();
-      const delta = e.deltaY > 0 ? -0.1 : 0.1;
-      handleZoom2(delta);
+  const startBfs = () => {
+    if (nodes.length === 0) {
+      setMessage('Add nodes first.');
+      return;
     }
-  };
 
-  const handlePanStart = (e) => {
-    if (e.target.tagName === 'circle') return;
-    setIsPanning(true);
-    setPanStart({ x: e.clientX, y: e.clientY });
-  };
-
-  const handlePanStart2 = (e) => {
-    if (e.target.tagName === 'circle') return;
-    setIsPanning2(true);
-    setPanStart2({ x: e.clientX, y: e.clientY });
-  };
-
-  const handleMouseDown = useCallback((e, node) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const rect = e.currentTarget.closest('svg').getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-    
-    setDraggedNode(node.id);
-    setDragOffset({
-      x: mouseX - node.x,
-      y: mouseY - node.y
-    });
-  }, []);
-
-  const handleMouseMove = (e) => {
-    if (draggedNode) {
-      e.preventDefault();
-      e.stopPropagation();
-      const rect = e.currentTarget.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      
-      const newX = Math.max(25, Math.min(width - 25, mouseX - dragOffset.x));
-      const newY = Math.max(25, Math.min(height - 25, mouseY - dragOffset.y));
-      
-      // Update nodes immediately without triggering effects
-      setNodes(prev => prev.map(node => 
-        node.id === draggedNode 
-          ? { ...node, x: newX, y: newY }
-          : node
-      ));
-    } else if (isPanning) {
-      const deltaX = e.clientX - panStart.x;
-      const deltaY = e.clientY - panStart.y;
-      setPan(prev => ({
-        x: prev.x + deltaX,
-        y: prev.y + deltaY
-      }));
-      setPanStart({ x: e.clientX, y: e.clientY });
-    } else if (isPanning2) {
-      const deltaX = e.clientX - panStart2.x;
-      const deltaY = e.clientY - panStart2.y;
-      setPan2(prev => ({
-        x: prev.x + deltaX,
-        y: prev.y + deltaY
-      }));
-      setPanStart2({ x: e.clientX, y: e.clientY });
+    if (source === '' || target === '') {
+      setMessage('Select valid source and target nodes.');
+      return;
     }
+
+    const { steps: generated, error } = generateSteps(nodes, edges, source, target);
+    if (error) {
+      setMessage(error);
+      return;
+    }
+
+    setSteps(generated);
+    setStepIndex(0);
+    setIsPlaying(true);
+    setMessage(generated[0]?.narration || 'BFS initialized.');
+  };
+
+  const pause = () => setIsPlaying(false);
+  const play = () => {
+    if (steps.length === 0 || stepIndex >= steps.length - 1) return;
+    setIsPlaying(true);
+  };
+
+  const stepBackward = () => {
+    setIsPlaying(false);
+    setStepIndex((prev) => Math.max(prev - 1, 0));
+  };
+
+  const stepForward = () => {
+    setIsPlaying(false);
+    setStepIndex((prev) => Math.min(prev + 1, Math.max(steps.length - 1, 0)));
+  };
+
+  const resetPlayback = () => {
+    setIsPlaying(false);
+    setStepIndex(0);
+    if (steps[0]) setMessage(steps[0].narration);
+  };
+
+  const handleNodeMouseDown = (event, nodeId) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const svgRect = svgRef.current?.getBoundingClientRect();
+    if (!svgRect) return;
+
+    const node = nodeMap[nodeId];
+    if (!node) return;
+
+    const mouseX = event.clientX - svgRect.left;
+    const mouseY = event.clientY - svgRect.top;
+
+    setDraggingId(nodeId);
+    setDragOffset({ x: mouseX - node.x, y: mouseY - node.y });
+  };
+
+  const handleMouseMove = (event) => {
+    if (!draggingId) return;
+
+    const svgRect = svgRef.current?.getBoundingClientRect();
+    if (!svgRect) return;
+
+    const mouseX = event.clientX - svgRect.left;
+    const mouseY = event.clientY - svgRect.top;
+
+    const x = Math.max(NODE_RADIUS, Math.min(SVG_WIDTH - NODE_RADIUS, mouseX - dragOffset.x));
+    const y = Math.max(NODE_RADIUS, Math.min(SVG_HEIGHT - NODE_RADIUS, mouseY - dragOffset.y));
+
+    setNodes((prev) => prev.map((n) => (n.id === draggingId ? { ...n, x, y } : n)));
   };
 
   const handleMouseUp = () => {
-    if (draggedNode) {
-      saveToHistory(nodes, edges, `Moved node ${draggedNode}`);
-    }
-    setDraggedNode(null);
-    setDragOffset({ x: 0, y: 0 });
-    setIsPanning(false);
-    setIsPanning2(false);
+    if (!draggingId) return;
+    setDraggingId(null);
   };
 
-  // Mathematical path calculation
-  const getCurrentPath = () => {
-    if (!isAnimating) return path;
-    return animationPath.slice(0, animationIndex + 1);
+  const renderOverlayEdge = (edgeKey, stroke, width) => {
+    if (!edgeKeys.has(edgeKey)) return null;
+
+    const [a, b] = edgeKey.split('-').map(Number);
+    const n1 = nodeMap[a];
+    const n2 = nodeMap[b];
+    if (!n1 || !n2) return null;
+
+    return (
+      <line
+        key={`${stroke}-${edgeKey}`}
+        x1={n1.x}
+        y1={n1.y}
+        x2={n2.x}
+        y2={n2.y}
+        stroke={stroke}
+        strokeWidth={width}
+        strokeLinecap="round"
+      />
+    );
   };
-
-  const currentPath = getCurrentPath();
-
-  // Calculate mathematical properties
-  const calculateGraphProperties = () => {
-    const nodeCount = nodes.length;
-    const edgeCount = edges.length;
-    const connectedComponents = calculateConnectedComponents();
-    const degrees = getNodeDegrees();
-    const maxCurrentDegree = nodeCount > 0 ? Math.max(...Object.values(degrees)) : 0;
-    const averageDegree = edgeCount > 0 ? (2 * edgeCount) / nodeCount : 0;
-    
-    return {
-      nodeCount,
-      edgeCount,
-      connectedComponents,
-      maxCurrentDegree,
-      averageDegree: averageDegree.toFixed(2)
-    };
-  };
-
-  const calculateConnectedComponents = () => {
-    if (nodes.length === 0) return 0;
-    
-    const visited = new Set();
-    let components = 0;
-    
-    const dfs = (nodeId) => {
-      visited.add(nodeId);
-      const neighbors = edges
-        .filter(e => e.from === nodeId || e.to === nodeId)
-        .map(e => e.from === nodeId ? e.to : e.from);
-      
-      neighbors.forEach(neighbor => {
-        if (!visited.has(neighbor)) {
-          dfs(neighbor);
-        }
-      });
-    };
-    
-    nodes.forEach(node => {
-      if (!visited.has(node.id)) {
-        dfs(node.id);
-        components++;
-      }
-    });
-    
-    return components;
-  };
-
-  const graphProps = calculateGraphProperties();
 
   return (
-    <>
-
-      <div className="algo-dark min-h-screen">
-        <div className="container mx-auto px-4 py-6">
-
-        {/* Header */}
-        <header className="mb-4">
-          <h1 className="text-2xl font-bold text-slate-100">Breadth-First Search (BFS)</h1>
-          <p className="text-slate-400 text-sm mt-1">Shortest-path traversal with step-by-step animation</p>
-          <div className="flex flex-wrap items-center gap-4 mt-3 text-xs text-slate-400">
-            <span>V = {graphProps.nodeCount}</span>
-            <span>E = {graphProps.edgeCount}</span>
-            <span>Components = {graphProps.connectedComponents}</span>
-            <span>&Delta; = {graphProps.maxCurrentDegree}</span>
-            <span>Avg deg = {graphProps.averageDegree}</span>
+    <div className="algo-dark min-h-screen">
+      <div className="mx-auto w-full max-w-[1520px] px-4 py-6 lg:px-6">
+        <header className="mb-5 rounded-2xl border border-slate-800 bg-slate-900/90 p-5 shadow-elevation-2">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-100">Breadth-First Search</h1>
+              <p className="mt-1 text-sm text-slate-400">
+                Level-order shortest path in an unweighted graph with explicit queue, tree, and path phases.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <StatChip label="Nodes" value={nodes.length} />
+              <StatChip label="Edges" value={edges.length} />
+              <StatChip label="Step" value={steps.length ? `${stepIndex + 1}/${steps.length}` : '0/0'} />
+              <StatChip label="Path Length" value={pathLength ?? '-'} />
+            </div>
           </div>
         </header>
 
-        {/* Algorithm Information */}
-        {algorithmInfo && (
-          <div className="mb-4 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-300">
-            {algorithmInfo}
+        <section className="mb-5 grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4 shadow-elevation-2">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-300">Graph Controls</h2>
+            <div className="mt-3 grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+              <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-300">Build</p>
+                <div className="mt-2 space-y-2">
+                  <button className={`${buttonBase} w-full bg-sky-600 text-white hover:bg-sky-500`} onClick={addNode}>
+                    Add Single Node
+                  </button>
+                  <label className="block text-xs text-slate-300">
+                    Bulk Add Nodes (1-50)
+                    <div className="mt-1 flex flex-wrap gap-2">
+                      <input
+                        className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
+                        value={bulkNodeCount}
+                        onChange={(e) => setBulkNodeCount(e.target.value)}
+                      />
+                      <button className={`${buttonBase} shrink-0 bg-cyan-700 text-white hover:bg-cyan-600`} onClick={addBulkNodes}>
+                        Add
+                      </button>
+                    </div>
+                  </label>
+                  <button className={`${buttonBase} w-full bg-indigo-600 text-white hover:bg-indigo-500`} onClick={loadExample}>
+                    Load Example Graph
+                  </button>
+                  <button className={`${buttonBase} w-full bg-blue-700 text-white hover:bg-blue-600`} onClick={randomizeGraph}>
+                    New Random Graph
+                  </button>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-cyan-300">Modify</p>
+                <div className="mt-2 space-y-2">
+                  <label className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2 text-xs text-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={autoConnectNewNodes}
+                      onChange={(e) => setAutoConnectNewNodes(e.target.checked)}
+                      className="h-4 w-4"
+                    />
+                    <span className="min-w-0 leading-snug">Auto-connect newly added nodes with random edges</span>
+                  </label>
+                  <label className="block text-xs text-slate-300">
+                    Add Edge (u, v)
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <input
+                        className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
+                        value={edgeFrom}
+                        onChange={(e) => setEdgeFrom(e.target.value)}
+                        placeholder="from"
+                      />
+                      <input
+                        className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
+                        value={edgeTo}
+                        onChange={(e) => setEdgeTo(e.target.value)}
+                        placeholder="to"
+                      />
+                      <button className={`${buttonBase} shrink-0 bg-emerald-600 text-white hover:bg-emerald-500`} onClick={addEdge}>
+                        Add
+                      </button>
+                    </div>
+                  </label>
+                  <label className="block text-xs text-slate-300">
+                    Add Random Edges
+                    <div className="mt-1 grid grid-cols-[1fr_auto] gap-2">
+                      <input
+                        className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
+                        value={randomEdgeCount}
+                        onChange={(e) => setRandomEdgeCount(e.target.value)}
+                        placeholder="count"
+                      />
+                      <button className={`${buttonBase} bg-teal-600 text-white hover:bg-teal-500`} onClick={addRandomEdges}>
+                        Generate
+                      </button>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-rose-300">Remove / Reset</p>
+                <div className="mt-2 space-y-2">
+                  <label className="block text-xs text-slate-300">
+                    Remove Node
+                    <div className="mt-1 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
+                      <input
+                        className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
+                        value={removeNodeId}
+                        onChange={(e) => setRemoveNodeId(e.target.value)}
+                        placeholder="node id"
+                      />
+                      <button className={`${buttonBase} bg-rose-700 text-white hover:bg-rose-600`} onClick={removeNode}>
+                        Remove
+                      </button>
+                    </div>
+                  </label>
+                  <label className="block text-xs text-slate-300">
+                    Remove Edge (u, v)
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <input
+                        className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
+                        value={removeEdgeFrom}
+                        onChange={(e) => setRemoveEdgeFrom(e.target.value)}
+                        placeholder="from"
+                      />
+                      <input
+                        className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
+                        value={removeEdgeTo}
+                        onChange={(e) => setRemoveEdgeTo(e.target.value)}
+                        placeholder="to"
+                      />
+                      <button className={`${buttonBase} shrink-0 bg-rose-700 text-white hover:bg-rose-600`} onClick={removeEdge}>
+                        Remove
+                      </button>
+                    </div>
+                  </label>
+                  <button className={`${buttonBase} w-full bg-rose-800 text-white hover:bg-rose-700`} onClick={clearGraph}>
+                    Clear Entire Graph
+                  </button>
+                </div>
+              </div>
+            </div>
+            <p className="mt-3 rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-400">
+              Traversal order is deterministic: adjacency lists are sorted by node ID.
+            </p>
           </div>
-        )}
 
-        {/* Max Degree Constraint — compact row */}
-        <div className="flex flex-wrap items-center gap-3 mb-4 text-sm">
-          <label className="flex items-center gap-2 text-slate-300">
-            <input
-              type="checkbox"
-              checked={enforceMaxDegree}
-              onChange={(e) => setEnforceMaxDegree(e.target.checked)}
-              className="h-4 w-4 rounded border-slate-600"
-            />
-            Max &Delta;
-          </label>
-          <input
-            type="number"
-            placeholder="k"
-            value={maxDegree}
-            onChange={(e) => setMaxDegree(e.target.value)}
-            min="1"
-            disabled={!enforceMaxDegree}
-            className="w-16 px-2 py-1 border border-slate-600 rounded bg-slate-800 text-slate-200 text-sm disabled:opacity-40"
-          />
-          {enforceMaxDegree && maxDegree && (
-            <span className="text-slate-500">({parseInt(maxDegree) + 1} colors needed)</span>
-          )}
-        </div>
-
-        {/* Control Panel */}
-        <div className="bg-slate-900 rounded-lg border border-slate-800 p-4 mb-6">
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-
-            {/* Node Operations */}
-            <div>
-              <h3 className="text-sm font-semibold text-slate-300 mb-2">Nodes</h3>
-              
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Node Actions</label>
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4 shadow-elevation-2">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-300">Playback Controls</h2>
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <label className="col-span-1 text-xs text-slate-300">
+                Source
                 <select
-                  value={showNodeInput}
-                  onChange={(e) => {
-                    const action = e.target.value;
-                    if (action === 'add-single') {
-                      addNode();
-                      setShowNodeInput('');
-                    } else {
-                      setShowNodeInput(action);
-                      setTempInputs(prev => ({ ...prev, bulkCount: '', deleteNodeId: '' }));
-                    }
-                  }}
-                  className="w-full px-3 py-2.5 border border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-slate-800 font-medium text-slate-200 hover:border-slate-500 transition-colors cursor-pointer"
+                  className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
+                  value={source}
+                  onChange={(e) => setSource(Number(e.target.value))}
+                  disabled={allIds.length === 0}
                 >
-                  <option value="">Select Node Operation...</option>
-                  <option value="add-single">Add Single Node</option>
-                  <option value="add-bulk">Add Multiple Nodes</option>
-                  <option value="delete">Delete Node</option>
+                  {allIds.map((id) => (
+                    <option key={`src-${id}`} value={id}>
+                      {id}
+                    </option>
+                  ))}
                 </select>
-
-                                {/* Bulk Nodes Input */}
-                {showNodeInput === 'add-bulk' && (
-                  <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg overflow-hidden">
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Number of nodes to add (1-50)</label>
-                    <div className="flex flex-col sm:flex-row gap-2">
-                <input 
-                  type="number"
-                  min="1"
-                  max="50"
-                        value={tempInputs.bulkCount}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setTempInputs(prev => ({ ...prev, bulkCount: value }));
-                          
-                          // Clear error when user starts typing
-                          if (inputErrors.bulkCount) {
-                            setInputErrors(prev => ({ ...prev, bulkCount: '' }));
-                          }
-                        }}
-                        placeholder="Enter count..."
-                        className={`flex-1 min-w-0 px-3 py-2 border rounded-lg focus:ring-2 ${
-                          inputErrors.bulkCount 
-                            ? 'border-red-500 focus:ring-red-500 focus:border-red-500' 
-                            : 'border-slate-300 focus:ring-blue-500 focus:border-blue-500'
-                        }`}
-                        autoFocus
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
-                            const count = parseInt(tempInputs.bulkCount);
-                            if (isNaN(count) || count < 1 || count > 50) {
-                              setInputErrors(prev => ({ ...prev, bulkCount: 'Please enter a number between 1 and 50' }));
-                              return;
-                            }
-                            addBulkNodes(tempInputs.bulkCount);
-                            setShowNodeInput('');
-                            setInputErrors(prev => ({ ...prev, bulkCount: '' }));
-                    }
-                  }}
-                />
-                      <div className="flex gap-2 flex-shrink-0">
-                <button 
-                          onClick={() => {
-                            const count = parseInt(tempInputs.bulkCount);
-                            if (isNaN(count) || count < 1 || count > 50) {
-                              setInputErrors(prev => ({ ...prev, bulkCount: 'Please enter a number between 1 and 50' }));
-                              return;
-                            }
-                            addBulkNodes(tempInputs.bulkCount);
-                            setShowNodeInput('');
-                            setInputErrors(prev => ({ ...prev, bulkCount: '' }));
-                          }}
-                          disabled={!tempInputs.bulkCount}
-                          className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors text-sm"
-                        >
-                          Add
-                        </button>
-                        <button
-                          onClick={() => {
-                            setShowNodeInput('');
-                            setInputErrors(prev => ({ ...prev, bulkCount: '' }));
-                          }}
-                          className="px-2 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm"
-                        >
-                          ✕
-                </button>
-              </div>
-              </div>
-                    {inputErrors.bulkCount && (
-                      <div className="mt-2 text-sm text-red-600 flex items-center gap-1">
-                        <span>⚠️</span>
-                        {inputErrors.bulkCount}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Delete Node Input */}
-                {showNodeInput === 'delete' && (
-                  <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg overflow-hidden">
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Node ID to delete</label>
-                    <div className="flex flex-col sm:flex-row gap-2">
-                <input 
-                  type="number"
-                        value={tempInputs.deleteNodeId}
-                        onChange={(e) => {
-                          setTempInputs(prev => ({ ...prev, deleteNodeId: e.target.value }));
-                          // Clear error when user starts typing
-                          if (inputErrors.deleteNode) {
-                            setInputErrors(prev => ({ ...prev, deleteNode: '' }));
-                          }
-                        }}
-                        placeholder="Enter node ID..."
-                        className={`flex-1 min-w-0 px-3 py-2 border rounded-lg focus:ring-2 ${
-                          inputErrors.deleteNode 
-                            ? 'border-red-500 focus:ring-red-500 focus:border-red-500' 
-                            : 'border-slate-300 focus:ring-red-500 focus:border-red-500'
-                        }`}
-                        autoFocus
-                  onKeyPress={(e) => {
-                          if (e.key === 'Enter' && tempInputs.deleteNodeId) {
-                            setDeleteNodeId(tempInputs.deleteNodeId);
-                      deleteNode();
-                            setShowNodeInput('');
-                    }
-                  }}
-                />
-                      <div className="flex gap-2 flex-shrink-0">
-                <button 
-                          onClick={() => {
-                            if (tempInputs.deleteNodeId) {
-                              setDeleteNodeId(tempInputs.deleteNodeId);
-                              deleteNode();
-                              setShowNodeInput('');
-                            }
-                          }}
-                          disabled={!tempInputs.deleteNodeId}
-                          className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors text-sm"
-                        >
-                          Delete
-                        </button>
-                        <button
-                          onClick={() => {
-                            setShowNodeInput('');
-                            setInputErrors(prev => ({ ...prev, deleteNode: '' }));
-                          }}
-                          className="px-2 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm"
-                        >
-                          ✕
-                </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
+              </label>
+              <label className="col-span-1 text-xs text-slate-300">
+                Target
+                <select
+                  className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
+                  value={target}
+                  onChange={(e) => setTarget(Number(e.target.value))}
+                  disabled={allIds.length === 0}
+                >
+                  {allIds.map((id) => (
+                    <option key={`tgt-${id}`} value={id}>
+                      {id}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button className={`${buttonBase} bg-blue-600 text-white hover:bg-blue-500`} onClick={startBfs}>
+                Start BFS
+              </button>
+              <button
+                className={`${buttonBase} bg-amber-600 text-white hover:bg-amber-500`}
+                onClick={play}
+                disabled={steps.length === 0 || stepIndex >= steps.length - 1 || isPlaying}
+              >
+                Play
+              </button>
+              <button
+                className={`${buttonBase} bg-orange-600 text-white hover:bg-orange-500`}
+                onClick={pause}
+                disabled={steps.length === 0 || !isPlaying}
+              >
+                Pause
+              </button>
+              <button
+                className={`${buttonBase} bg-sky-700 text-white hover:bg-sky-600`}
+                onClick={stepBackward}
+                disabled={steps.length === 0 || stepIndex <= 0}
+              >
+                Step Backward
+              </button>
+              <button
+                className={`${buttonBase} bg-violet-600 text-white hover:bg-violet-500`}
+                onClick={stepForward}
+                disabled={steps.length === 0 || stepIndex >= steps.length - 1}
+              >
+                Step Forward
+              </button>
+              <button
+                className={`${buttonBase} bg-slate-700 text-slate-100 hover:bg-slate-600`}
+                onClick={resetPlayback}
+                disabled={steps.length === 0}
+              >
+                Reset
+              </button>
             </div>
+            <label className="mt-3 block text-xs text-slate-300">
+              Speed ({(1000 / speedMs).toFixed(2)}x)
+              <input
+                type="range"
+                min="250"
+                max="1600"
+                step="50"
+                value={speedMs}
+                onChange={(e) => setSpeedMs(Number(e.target.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+          </div>
+        </section>
 
-            {/* Edge Operations */}
-            <div>
-              <h3 className="text-sm font-semibold text-slate-300 mb-2">Edges</h3>
-              
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Edge Actions</label>
-                <select
-                  value={showEdgeInput}
-                  onChange={(e) => {
-                    const action = e.target.value;
-                    setShowEdgeInput(action);
-                    setTempInputs(prev => ({ 
-                      ...prev, 
-                      edgeFrom: '', 
-                      edgeTo: '', 
-                      randomEdgeCount: '' 
-                    }));
-                  }}
-                  className="w-full px-3 py-2.5 border border-slate-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-slate-800 font-medium text-slate-200 hover:border-slate-500 transition-colors cursor-pointer"
-                >
-                  <option value="">Select Edge Operation...</option>
-                  <option value="add">Add Edge</option>
-                  <option value="delete">Delete Edge</option>
-                  <option value="generate">Generate Random Edges</option>
-                </select>
-
-                                {/* Add Edge Input */}
-                {showEdgeInput === 'add' && (
-                  <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg overflow-hidden">
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Add edge between nodes</label>
-                    <div className="flex flex-col sm:flex-row gap-2 mb-2">
-                  <input 
-                    type="number"
-                        value={tempInputs.edgeFrom}
-                        onChange={(e) => {
-                          setTempInputs(prev => ({ ...prev, edgeFrom: e.target.value }));
-                          // Clear error when user starts typing
-                          if (inputErrors.edge) {
-                            setInputErrors(prev => ({ ...prev, edge: '' }));
-                          }
-                        }}
-                        placeholder="From node..."
-                        className={`flex-1 min-w-0 px-3 py-2 border rounded-lg focus:ring-2 ${
-                          inputErrors.edge 
-                            ? 'border-red-500 focus:ring-red-500 focus:border-red-500' 
-                            : 'border-slate-300 focus:ring-green-500 focus:border-green-500'
-                        }`}
-                        autoFocus
-                  />
-                  <input 
-                    type="number"
-                        value={tempInputs.edgeTo}
-                        onChange={(e) => {
-                          setTempInputs(prev => ({ ...prev, edgeTo: e.target.value }));
-                          // Clear error when user starts typing
-                          if (inputErrors.edge) {
-                            setInputErrors(prev => ({ ...prev, edge: '' }));
-                          }
-                        }}
-                        placeholder="To node..."
-                        className={`flex-1 min-w-0 px-3 py-2 border rounded-lg focus:ring-2 ${
-                          inputErrors.edge 
-                            ? 'border-red-500 focus:ring-red-500 focus:border-red-500' 
-                            : 'border-slate-300 focus:ring-green-500 focus:border-green-500'
-                        }`}
-                    onKeyPress={(e) => {
-                          if (e.key === 'Enter' && tempInputs.edgeFrom && tempInputs.edgeTo) {
-                            setInputErrors(prev => ({ ...prev, edge: '' }));
-                            const success = addEdge(tempInputs.edgeFrom, tempInputs.edgeTo);
-                            if (success) {
-                              setShowEdgeInput('');
-                            }
-                      }
-                    }}
-                  />
-                </div>
-                    <div className="flex gap-2 flex-shrink-0">
-                <button 
-                        onClick={() => {
-                          if (tempInputs.edgeFrom && tempInputs.edgeTo) {
-                            setInputErrors(prev => ({ ...prev, edge: '' })); // Clear previous errors
-                            
-                            const success = addEdge(tempInputs.edgeFrom, tempInputs.edgeTo);
-                            if (success) {
-                              setShowEdgeInput('');
-                            }
-                          }
-                        }}
-                        disabled={!tempInputs.edgeFrom || !tempInputs.edgeTo}
-                        className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors text-sm"
-                >
-                  Add Edge
-                </button>
-                      <button
-                        onClick={() => {
-                          setShowEdgeInput('');
-                          setInputErrors(prev => ({ ...prev, edge: '' }));
-                        }}
-                        className="px-2 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm"
-                      >
-                        ✕
-                </button>
-              </div>
-                    {inputErrors.edge && (
-                      <div className="mt-2 text-sm text-red-600 flex items-center gap-1">
-                        <span>⚠️</span>
-                        {inputErrors.edge}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                                {/* Delete Edge Input */}
-                {showEdgeInput === 'delete' && (
-                  <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg overflow-hidden">
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Delete edge between nodes</label>
-                    <div className="flex flex-col sm:flex-row gap-2 mb-2">
-                  <input 
-                    type="number"
-                        value={tempInputs.edgeFrom}
-                        onChange={(e) => {
-                          setTempInputs(prev => ({ ...prev, edgeFrom: e.target.value }));
-                          // Clear error when user starts typing
-                          if (inputErrors.edge) {
-                            setInputErrors(prev => ({ ...prev, edge: '' }));
-                          }
-                        }}
-                        placeholder="From node..."
-                        className={`flex-1 min-w-0 px-3 py-2 border rounded-lg focus:ring-2 ${
-                          inputErrors.edge 
-                            ? 'border-red-500 focus:ring-red-500 focus:border-red-500' 
-                            : 'border-slate-300 focus:ring-red-500 focus:border-red-500'
-                        }`}
-                        autoFocus
-                  />
-                  <input 
-                    type="number"
-                        value={tempInputs.edgeTo}
-                        onChange={(e) => {
-                          setTempInputs(prev => ({ ...prev, edgeTo: e.target.value }));
-                          // Clear error when user starts typing
-                          if (inputErrors.edge) {
-                            setInputErrors(prev => ({ ...prev, edge: '' }));
-                          }
-                        }}
-                        placeholder="To node..."
-                        className={`flex-1 min-w-0 px-3 py-2 border rounded-lg focus:ring-2 ${
-                          inputErrors.edge 
-                            ? 'border-red-500 focus:ring-red-500 focus:border-red-500' 
-                            : 'border-slate-300 focus:ring-red-500 focus:border-red-500'
-                        }`}
-                    onKeyPress={(e) => {
-                          if (e.key === 'Enter' && tempInputs.edgeFrom && tempInputs.edgeTo) {
-                            setInputErrors(prev => ({ ...prev, edge: '' }));
-                            setDeleteEdgeFrom(tempInputs.edgeFrom);
-                            setDeleteEdgeTo(tempInputs.edgeTo);
-                        deleteEdge();
-                            setShowEdgeInput('');
-                      }
-                    }}
-                  />
-                </div>
-                    <div className="flex gap-2 flex-shrink-0">
-                <button 
-                        onClick={() => {
-                          if (tempInputs.edgeFrom && tempInputs.edgeTo) {
-                            setInputErrors(prev => ({ ...prev, edge: '' }));
-                            setDeleteEdgeFrom(tempInputs.edgeFrom);
-                            setDeleteEdgeTo(tempInputs.edgeTo);
-                            deleteEdge();
-                            setShowEdgeInput('');
-                          }
-                        }}
-                        disabled={!tempInputs.edgeFrom || !tempInputs.edgeTo}
-                        className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors text-sm"
-                >
-                  Delete Edge
-                </button>
-                      <button
-                        onClick={() => {
-                          setShowEdgeInput('');
-                          setInputErrors(prev => ({ ...prev, edge: '' }));
-                        }}
-                        className="px-2 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm"
-                      >
-                        ✕
-                </button>
-              </div>
-                    {inputErrors.edge && (
-                      <div className="mt-2 text-sm text-red-600 flex items-center gap-1">
-                        <span>⚠️</span>
-                        {inputErrors.edge}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                                {/* Generate Random Edges Input */}
-                {showEdgeInput === 'generate' && (
-                  <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg overflow-hidden">
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Number of random edges to generate</label>
-                    <div className="flex flex-col sm:flex-row gap-2">
-                  <input 
-                    type="number"
-                        min="1"
-                        value={tempInputs.randomEdgeCount}
-                        onChange={(e) => setTempInputs(prev => ({ ...prev, randomEdgeCount: e.target.value }))}
-                        placeholder="Enter count..."
-                        className="flex-1 min-w-0 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        autoFocus
-                    onKeyPress={(e) => {
-                          if (e.key === 'Enter' && tempInputs.randomEdgeCount > 0) {
-                            setInputErrors(prev => ({ ...prev, edge: '' }));
-                            const success = generateRandomEdges(tempInputs.randomEdgeCount);
-                            if (success) {
-                              setShowEdgeInput('');
-                            }
-                      }
-                    }}
-                  />
-                      <div className="flex gap-2 flex-shrink-0">
-                  <button 
-                          onClick={() => {
-                            if (tempInputs.randomEdgeCount > 0) {
-                              setInputErrors(prev => ({ ...prev, edge: '' }));
-                              const success = generateRandomEdges(tempInputs.randomEdgeCount);
-                              if (success) {
-                                setShowEdgeInput('');
-                              }
-                            }
-                          }}
-                          disabled={!tempInputs.randomEdgeCount || tempInputs.randomEdgeCount <= 0}
-                          className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors text-sm"
-                        >
-                          Generate
-                  </button>
-                  <button 
-                          onClick={() => {
-                            setShowEdgeInput('');
-                            setInputErrors(prev => ({ ...prev, edge: '' }));
-                          }}
-                          className="px-2 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm"
-                        >
-                          ✕
-                  </button>
-                </div>
-                    </div>
-                    {inputErrors.edge && (
-                      <div className="mt-2 text-sm text-red-600 flex items-center gap-1">
-                        <span>⚠️</span>
-                        {inputErrors.edge}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Graph Templates</label>
-                <select
-                  onChange={(e) => {
-                    const template = e.target.value;
-                    if (template === 'example') createExampleGraph();
-                    else if (template === 'complete') createCompleteGraph();
-                    else if (template === 'cycle') createCycleGraph();
-                    else if (template === 'star') createStarGraph();
-                    e.target.value = '';
-                  }}
-                  className="w-full px-3 py-2.5 border border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-slate-800 font-medium text-slate-200 hover:border-slate-500 transition-colors cursor-pointer"
-                >
-                  <option value="" className="text-slate-500">Select Graph Template...</option>
-                  <option value="example">Example Graph</option>
-                  <option value="complete">Complete Graph</option>
-                  <option value="cycle">Cycle Graph</option>
-                  <option value="star">Star Graph</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Path Operations */}
-            <div>
-              <h3 className="text-sm font-semibold text-slate-300 mb-2">Path Finding</h3>
-              
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Path Actions</label>
-                <select
-                  value={showPathInput ? 'find-path' : ''}
-                  onChange={(e) => {
-                    const action = e.target.value;
-                    if (action === 'find-path') {
-                      setShowPathInput(true);
-                      setTempInputs(prev => ({ ...prev, pathStart: '', pathEnd: '' }));
-                    } else if (action === 'clear') {
-                      clearGraph();
-                    }
-                  }}
-                  className="w-full px-3 py-2.5 border border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-slate-800 font-medium text-slate-200 hover:border-slate-500 transition-colors cursor-pointer"
-                >
-                  <option value="">Select Path Operation...</option>
-                  <option value="find-path">Find Shortest Path</option>
-                  <option value="clear">Clear Graph</option>
-                </select>
-
-                                {/* Path Finding Input */}
-                {showPathInput && (
-                  <div className="mt-3 p-3 bg-purple-50 border border-purple-200 rounded-lg overflow-hidden">
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Find shortest path between nodes</label>
-                    <div className="flex flex-col sm:flex-row gap-2 mb-2">
-                  <input 
-                    type="number"
-                        value={tempInputs.pathStart}
-                        onChange={(e) => {
-                          setTempInputs(prev => ({ ...prev, pathStart: e.target.value }));
-                          // Clear error when user starts typing
-                          if (inputErrors.path) {
-                            setInputErrors(prev => ({ ...prev, path: '' }));
-                          }
-                        }}
-                        placeholder="Start node..."
-                        className={`flex-1 min-w-0 px-3 py-2 border rounded-lg focus:ring-2 ${
-                          inputErrors.path 
-                            ? 'border-red-500 focus:ring-red-500 focus:border-red-500' 
-                            : 'border-slate-300 focus:ring-purple-500 focus:border-purple-500'
-                        }`}
-                        autoFocus
-                  />
-                  <input 
-                    type="number"
-                        value={tempInputs.pathEnd}
-                        onChange={(e) => {
-                          setTempInputs(prev => ({ ...prev, pathEnd: e.target.value }));
-                          // Clear error when user starts typing
-                          if (inputErrors.path) {
-                            setInputErrors(prev => ({ ...prev, path: '' }));
-                          }
-                        }}
-                        placeholder="End node..."
-                        className={`flex-1 min-w-0 px-3 py-2 border rounded-lg focus:ring-2 ${
-                          inputErrors.path 
-                            ? 'border-red-500 focus:ring-red-500 focus:border-red-500' 
-                            : 'border-slate-300 focus:ring-purple-500 focus:border-purple-500'
-                        }`}
-                    onKeyPress={(e) => {
-                          if (e.key === 'Enter' && tempInputs.pathStart && tempInputs.pathEnd) {
-                            setInputErrors(prev => ({ ...prev, path: '' }));
-                            const success = compute(tempInputs.pathStart, tempInputs.pathEnd);
-                            if (success) {
-                              setShowPathInput(false);
-                            }
-                      }
-                    }}
-                  />
-                </div>
-                    <div className="flex gap-2 flex-shrink-0">
-                <button 
-                        onClick={() => {
-                          if (tempInputs.pathStart && tempInputs.pathEnd) {
-                            setInputErrors(prev => ({ ...prev, path: '' }));
-                            const success = compute(tempInputs.pathStart, tempInputs.pathEnd);
-                            if (success) {
-                              setShowPathInput(false);
-                            }
-                          }
-                        }}
-                        disabled={!tempInputs.pathStart || !tempInputs.pathEnd}
-                        className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors text-sm"
-                      >
-                        Find Path
-                </button>
-                <button 
-                        onClick={() => {
-                          setShowPathInput(false);
-                          setInputErrors(prev => ({ ...prev, path: '' }));
-                        }}
-                        className="px-2 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm"
-                      >
-                        ✕
-                </button>
-                    </div>
-                    {inputErrors.path && (
-                      <div className="mt-2 text-sm text-red-600 flex items-center gap-1">
-                        <span>⚠️</span>
-                        {inputErrors.path}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Mathematical Controls */}
-            <div>
-              <h3 className="text-sm font-semibold text-slate-300 mb-2">Tools</h3>
-              
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">History Actions</label>
-                <select
-                  onChange={(e) => {
-                    const action = e.target.value;
-                    if (action === 'undo' && currentStep > 0) undo();
-                    else if (action === 'redo' && currentStep < history.length) redo();
-                    e.target.value = '';
-                  }}
-                  className="w-full px-3 py-2.5 border border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-slate-800 font-medium text-slate-200 hover:border-slate-500 transition-colors cursor-pointer"
-                >
-                  <option value="" className="text-slate-500">Select History Action...</option>
-                  <option value="undo" disabled={currentStep === 0}>Undo {currentStep > 0 ? `(${currentStep} available)` : '(none)'}</option>
-                  <option value="redo" disabled={currentStep >= history.length}>Redo {currentStep < history.length ? `(${history.length - currentStep} available)` : '(none)'}</option>
-                </select>
-              </div>
-
-
-
-                             {/* BFS Animation Controls */}
-               {isAnimating && bfsSteps.length > 0 && (
-                 <div className="space-y-3">
-                   <label className="text-sm font-medium text-slate-700">BFS Animation</label>
-                   
-                   {/* Play/Pause Controls */}
-                   <div className="grid grid-cols-3 gap-2">
-                <button 
-                       onClick={isPlayingAnimation ? pauseAnimation : playAnimation}
-                       disabled={currentBfsStep >= bfsSteps.length - 1}
-                       className="bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium py-2 px-3 rounded-lg transition-colors flex items-center justify-center"
-                     >
-                       {isPlayingAnimation ? '⏸️' : '▶️'}
-                </button>
-                <button 
-                       onClick={resetAnimation}
-                       className="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-3 rounded-lg transition-colors"
-                >
-                       ⏮️
-                </button>
-                     <div className="text-xs text-slate-600 flex items-center justify-center">
-                       {currentBfsStep + 1}/{bfsSteps.length}
-                     </div>
-              </div>
-
-                   {/* Step Controls */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <button 
-                       onClick={prevBfsStep}
-                       disabled={currentBfsStep === 0}
-                      className="bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded-lg transition-colors"
-                    >
-                       ⏪ Previous
-                    </button>
-                    <button 
-                       onClick={nextBfsStep}
-                       disabled={currentBfsStep >= bfsSteps.length - 1}
-                      className="bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded-lg transition-colors"
-                    >
-                       Next ⏩
-                    </button>
-                  </div>
-
-                   {/* Speed Control */}
-                <div className="space-y-1">
-                     <label className="text-xs font-medium text-slate-700">Speed: {(1000 / animationSpeed).toFixed(1)}x</label>
-                    <input 
-                       type="range"
-                       min="200"
-                       max="2000"
-                       step="100"
-                       value={animationSpeed}
-                       onChange={(e) => setAnimationSpeed(parseInt(e.target.value))}
-                       className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                     />
-                     <div className="flex justify-between text-xs text-slate-500">
-                       <span>Fast</span>
-                       <span>Slow</span>
-                </div>
-              </div>
-
-                   {/* Step Progress Bar */}
-                   <div className="w-full bg-gray-200 rounded-full h-2">
-                     <div 
-                       className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                       style={{ width: `${((currentBfsStep + 1) / bfsSteps.length) * 100}%` }}
-                     ></div>
-                  </div>
-                </div>
+        <section className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4 shadow-elevation-2">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-300">Graph View</h2>
+              {currentStep && (
+                <span className="rounded-full border border-slate-700 bg-slate-800 px-3 py-1 text-xs text-slate-300">
+                  Phase: {currentStep.phase === 'path' ? 'Final Path' : 'Search'}
+                </span>
               )}
-
-              {/* Mathematical Display Options */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Display Options</label>
-                <select
-                  onChange={(e) => {
-                    const option = e.target.value;
-                    if (option === 'coordinates') setShowCoordinates(!showCoordinates);
-                    else if (option === 'distances') setShowDistance(!showDistance);
-                    else if (option === 'degrees') setShowDegrees(!showDegrees);
-                    e.target.value = '';
-                  }}
-                  className="w-full px-3 py-2.5 border border-slate-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-slate-800 font-medium text-slate-200 hover:border-slate-500 transition-colors cursor-pointer"
-                >
-                  <option value="" className="text-slate-500">Toggle Display Options...</option>
-                  <option value="coordinates">Coordinates {showCoordinates ? '(ON)' : '(OFF)'}</option>
-                  <option value="distances">Distances {showDistance ? '(ON)' : '(OFF)'}</option>
-                  <option value="degrees">Node Degrees {showDegrees ? '(ON)' : '(OFF)'}</option>
-                </select>
-              </div>
             </div>
-          </div>
-        </div>
-
-        {/* Graph Stats */}
-        <div className="bg-slate-900 rounded-xl border border-slate-800 p-6 mb-8">
-          <div className="flex flex-wrap gap-8 text-sm text-slate-600">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold">Nodes:</span>
-              <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">{nodes.length}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="font-semibold">Edges:</span>
-              <span className="bg-green-100 text-green-800 px-2 py-1 rounded">{edges.length}</span>
-            </div>
-            {nodes.length > 0 && (
-              <div className="flex items-center gap-2">
-                <span className="font-semibold">Node IDs:</span>
-                <span className="bg-slate-700 text-slate-200 px-2 py-1 rounded">{nodes.map(n => n.id).sort((a, b) => a - b).join(', ')}</span>
-              </div>
-            )}
-            {enforceMaxDegree && maxDegree && (
-              <div className="flex items-center gap-2">
-                <span className="font-semibold">Max Degree Limit:</span>
-                <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded">{maxDegree}</span>
-              </div>
-            )}
-          </div>
-        </div>
-
-                 {/* Split-Screen Graph Visualization */}
-         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 visualization-section">
-           {/* Main Graph */}
-        <div className="bg-slate-900 rounded-xl border border-slate-800 p-8">
-                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
-               <h3 className="text-lg font-semibold text-slate-800">Main Graph</h3>
-              <div className="flex items-center gap-4">
-                 {path.length > 0 && (
-                  <div className="text-sm text-slate-600 bg-slate-100 px-3 py-1 rounded-full">
-                     Path: {path.join(' → ')} (Length: {path.length - 1})
-                  </div>
-                )}
-                <div className="text-sm text-slate-500">
-                   Zoom: ×{zoom.toFixed(1)}
-                </div>
-              </div>
-            </div>
-          
-             <div className="flex justify-center overflow-x-auto custom-scrollbar">
-                          <svg 
-                 id="main-svg"
+            <div className="overflow-auto rounded-xl border border-slate-800 bg-slate-950 p-2">
+              <svg
                 ref={svgRef}
-                width={width} 
-                height={height} 
-                className="border-2 border-slate-300 rounded-lg bg-gradient-to-br from-slate-50 to-slate-100 min-w-full"
-                viewBox={`0 0 ${width} ${height}`}
+                width={SVG_WIDTH}
+                height={SVG_HEIGHT}
+                viewBox={`0 0 ${SVG_WIDTH} ${SVG_HEIGHT}`}
+                className="h-auto w-full"
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
                 onMouseLeave={handleMouseUp}
-                onMouseDown={handlePanStart}
-                onWheel={handleWheel}
-                style={{
-                  transform: `scale(${zoom}) translate(${pan.x}px, ${pan.y}px)`,
-                  transformOrigin: 'center',
-                  transition: draggedNode || isPanning ? 'none' : 'transform 0.1s ease-out',
-                   cursor: isPanning ? 'grabbing' : draggedNode ? 'grabbing' : 'grab'
-                }}
               >
-              {/* Edges */}
-              {edges.map((e, i) => {
-                const a = nodes.find(n => n.id === e.from);
-                const b = nodes.find(n => n.id === e.to);
-                if (!a || !b) return null;
-                
-                const idxA = currentPath.indexOf(e.from);
-                const idxB = currentPath.indexOf(e.to);
-                const isOnPath = idxA !== -1 && idxB !== -1 && Math.abs(idxA - idxB) === 1;
-                const isCurrentStep = isAnimating && idxA === animationIndex && idxB === animationIndex + 1;
-                
-                // Calculate distance for display
-                const distance = Math.sqrt(Math.pow(b.x - a.x, 2) + Math.pow(b.y - a.y, 2));
-                const midX = (a.x + b.x) / 2;
-                const midY = (a.y + b.y) / 2;
-                
-                return (
-                  <g key={i}>
+                {edges.map((edge) => {
+                  const n1 = nodeMap[edge.from];
+                  const n2 = nodeMap[edge.to];
+                  if (!n1 || !n2) return null;
+
+                  return (
                     <line
-                      x1={a.x}
-                      y1={a.y}
-                      x2={b.x}
-                      y2={b.y}
-                      stroke={isCurrentStep ? '#EF4444' : isOnPath ? '#7C3AED' : '#9CA3AF'}
-                      strokeWidth={isCurrentStep ? 4 : isOnPath ? 3 : 2}
-                      className="transition-all duration-300"
+                      key={`base-${toEdgeKey(edge.from, edge.to)}`}
+                      x1={n1.x}
+                      y1={n1.y}
+                      x2={n2.x}
+                      y2={n2.y}
+                      stroke="#334155"
+                      strokeWidth={2}
+                      strokeLinecap="round"
                     />
-                    {showDistance && (
+                  );
+                })}
+
+                {currentStep?.treeEdges?.map((key) => renderOverlayEdge(key, '#22d3ee', 3))}
+                {currentStep?.pathEdges?.map((key) => renderOverlayEdge(key, '#fb7185', 5))}
+
+                {nodes.map((node) => {
+                  const isSource = Number(source) === node.id;
+                  const isTarget = Number(target) === node.id;
+                  const inPath = (currentStep?.pathNodes || []).includes(node.id);
+                  const isCurrent = currentStep?.current === node.id;
+                  const isQueued = (currentStep?.queue || []).includes(node.id);
+                  const isVisited = (currentStep?.visited || []).includes(node.id);
+                  const isNew = (currentStep?.newlyDiscovered || []).includes(node.id);
+                  const distance = currentStep?.distances?.[node.id];
+                  const isCurrentLevel =
+                    currentStep?.currentLevel !== null &&
+                    currentStep?.currentLevel !== undefined &&
+                    distance === currentStep.currentLevel;
+
+                  let fill = '#1f2937';
+                  let stroke = '#64748b';
+                  let strokeWidth = 2;
+
+                  if (isVisited) {
+                    fill = '#1d4ed8';
+                    stroke = '#60a5fa';
+                  }
+                  if (isQueued) {
+                    fill = '#a16207';
+                    stroke = '#fbbf24';
+                  }
+                  if (isCurrent) {
+                    fill = '#0f766e';
+                    stroke = '#2dd4bf';
+                    strokeWidth = 4;
+                  }
+                  if (inPath) {
+                    fill = '#be123c';
+                    stroke = '#fb7185';
+                    strokeWidth = 4;
+                  }
+
+                  return (
+                    <g key={node.id} onMouseDown={(e) => handleNodeMouseDown(e, node.id)} style={{ cursor: 'grab' }}>
+                      {isCurrentLevel && !inPath && (
+                        <circle cx={node.x} cy={node.y} r={NODE_RADIUS + 9} fill="none" stroke="#0ea5e9" strokeWidth={2} opacity={0.55} />
+                      )}
+                      {isNew && (
+                        <circle cx={node.x} cy={node.y} r={NODE_RADIUS + 5} fill="none" stroke="#22d3ee" strokeWidth={2} opacity={0.8} />
+                      )}
+
+                      <circle cx={node.x} cy={node.y} r={NODE_RADIUS} fill={fill} stroke={stroke} strokeWidth={strokeWidth} />
+
                       <text
-                        x={midX}
-                        y={midY}
+                        x={node.x}
+                        y={node.y}
+                        dy="0.35em"
                         textAnchor="middle"
-                        dy="-5"
-                        fontSize={10}
-                        fill="#6B7280"
-                        className="pointer-events-none"
+                        fontSize="14"
+                        fontWeight="700"
+                        fill="#f8fafc"
                       >
-                        {distance.toFixed(0)}
+                        {node.id}
                       </text>
-                    )}
-                  </g>
-                );
-              })}
 
-              {/* Nodes */}
-              {nodes.map(n => {
-                const isInPath = currentPath.includes(n.id);
-                const isCurrentStep = isAnimating && n.id === animationPath[animationIndex];
-                const degree = getNodeDegree(n.id);
-                const nodeColor = nodeColors[n.id] || '#E5E7EB';
-                   
-                return (
-                     <DraggableNode
-                    key={n.id}
-                       node={n}
-                       isInPath={isInPath}
-                       isCurrentStep={isCurrentStep}
-                       nodeColor={nodeColor}
-                       isDragged={draggedNode === n.id}
-                       showCoordinates={showCoordinates}
-                       showDegrees={showDegrees}
-                       degree={degree}
-                       enforceMaxDegree={enforceMaxDegree}
-                       maxDegree={maxDegree}
-                       onMouseDown={handleMouseDown}
-                     />
-                   );
-                 })}
-               </svg>
-             </div>
-           </div>
+                      {distance !== undefined && (
+                        <g>
+                          <rect
+                            x={node.x - 16}
+                            y={node.y - 44}
+                            width="32"
+                            height="16"
+                            rx="8"
+                            fill="#0f172a"
+                            stroke="#475569"
+                          />
+                          <text x={node.x} y={node.y - 32} textAnchor="middle" fontSize="10" fill="#cbd5e1">
+                            d={distance}
+                          </text>
+                        </g>
+                      )}
 
-           {/* BFS Algorithm Visualization */}
-           <div className="bg-slate-900 rounded-xl border border-slate-800 p-8">
-             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
-               <h3 className="text-lg font-semibold text-slate-800">BFS Algorithm State</h3>
-               <div className="text-sm text-slate-500">
-                 Zoom: ×{zoom2.toFixed(1)}
-               </div>
-             </div>
+                      {isSource && (
+                        <g>
+                          <circle cx={node.x - 22} cy={node.y - 22} r="9" fill="#0369a1" />
+                          <text x={node.x - 22} y={node.y - 19} textAnchor="middle" fontSize="10" fill="#e0f2fe" fontWeight="700">
+                            S
+                          </text>
+                        </g>
+                      )}
 
-             {/* BFS State Info */}
-             {isAnimating && bfsSteps.length > 0 && (
-               <div className="mb-4 space-y-2">
-                 <div className="bg-blue-50 p-3 rounded-lg">
-                   <div className="text-sm font-medium text-blue-800 mb-2">Current State:</div>
-                   <div className="grid grid-cols-2 gap-4 text-xs">
-                     <div>
-                       <span className="font-medium text-slate-700">Queue:</span>
-                       <div className="bg-slate-800 p-2 rounded border border-slate-700">
-                         {bfsQueue.length > 0 ? `[${bfsQueue.join(', ')}]` : 'Empty'}
-                       </div>
-                     </div>
-                     <div>
-                       <span className="font-medium text-slate-700">Visited:</span>
-                       <div className="bg-slate-800 p-2 rounded border border-slate-700">
-                         {visitedNodes.size > 0 ? `{${Array.from(visitedNodes).join(', ')}}` : 'None'}
-                       </div>
-                     </div>
-                   </div>
-                   {currentNode && (
-                     <div className="mt-2">
-                       <span className="font-medium text-slate-700">Current Node:</span>
-                       <span className="ml-2 bg-yellow-200 px-2 py-1 rounded text-slate-800">{currentNode}</span>
-                     </div>
-                   )}
-                 </div>
-               </div>
-             )}
-
-             <div className="flex justify-center overflow-x-auto custom-scrollbar">
-               <svg 
-                 id="aux-svg"
-                 width={width} 
-                 height={height} 
-                 className="border-2 border-slate-300 rounded-lg bg-gradient-to-br from-blue-50 to-blue-100 min-w-full"
-                 viewBox={`0 0 ${width} ${height}`}
-                 onMouseMove={handleMouseMove}
-                 onMouseUp={handleMouseUp}
-                 onMouseLeave={handleMouseUp}
-                 onMouseDown={handlePanStart2}
-                 onWheel={handleWheel2}
-                 style={{
-                   transform: `scale(${zoom2}) translate(${pan2.x}px, ${pan2.y}px)`,
-                   transformOrigin: 'center',
-                   transition: isPanning2 ? 'none' : 'transform 0.1s ease-out',
-                   cursor: isPanning2 ? 'grabbing' : 'grab'
-                 }}
-               >
-                 {/* Edges */}
-                 {edges.map((e, i) => {
-                   const a = nodes.find(n => n.id === e.from);
-                   const b = nodes.find(n => n.id === e.to);
-                   if (!a || !b) return null;
-                   
-                   const isInPath = path.includes(e.from) && path.includes(e.to);
-                   const isTraversed = visitedNodes.has(e.from) && visitedNodes.has(e.to);
-                   
-                   return (
-                     <g key={i}>
-                       <line
-                         x1={a.x}
-                         y1={a.y}
-                         x2={b.x}
-                         y2={b.y}
-                         stroke={isInPath ? '#7C3AED' : isTraversed ? '#10B981' : '#D1D5DB'}
-                         strokeWidth={isInPath ? 4 : isTraversed ? 3 : 2}
-                         className="transition-all duration-300"
-                       />
-                  </g>
-                );
-              })}
-
-                 {/* Nodes */}
-                 {nodes.map(n => {
-                   const isInPath = path.includes(n.id);
-                   const isVisited = visitedNodes.has(n.id);
-                   const isCurrent = currentNode === n.id;
-                   const isInQueue = bfsQueue.includes(n.id);
-                   const distance = distances[n.id];
-                   
-                   return (
-                     <BFSNode
-                       key={n.id}
-                       node={n}
-                       isInPath={isInPath}
-                       isVisited={isVisited}
-                       isCurrent={isCurrent}
-                       isInQueue={isInQueue}
-                       distance={distance}
-                     />
-                );
-              })}
-            </svg>
-             </div>
-
-             {/* Legend */}
-             {isAnimating && (
-               <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-                 <div className="flex items-center gap-2">
-                   <div className="w-4 h-4 rounded-full bg-red-500"></div>
-                   <span>Current</span>
-                 </div>
-                 <div className="flex items-center gap-2">
-                   <div className="w-4 h-4 rounded-full bg-orange-500"></div>
-                   <span>In Queue</span>
-                 </div>
-                 <div className="flex items-center gap-2">
-                   <div className="w-4 h-4 rounded-full bg-green-500"></div>
-                   <span>Visited</span>
-                 </div>
-                 <div className="flex items-center gap-2">
-                   <div className="w-4 h-4 rounded-full bg-purple-500"></div>
-                   <span>Final Path</span>
-                 </div>
-               </div>
-             )}
+                      {isTarget && (
+                        <g>
+                          <circle cx={node.x + 22} cy={node.y - 22} r="9" fill="#9f1239" />
+                          <text x={node.x + 22} y={node.y - 19} textAnchor="middle" fontSize="10" fill="#ffe4e6" fontWeight="700">
+                            T
+                          </text>
+                        </g>
+                      )}
+                    </g>
+                  );
+                })}
+              </svg>
+            </div>
           </div>
-        </div>
 
-         {/* BFS Algorithm Steps */}
-         {isAnimating && bfsSteps.length > 0 && (
-           <div className="mt-8 bg-slate-900 rounded-xl border border-slate-800 p-8 steps-section">
-             <h4 className="font-semibold text-slate-800 mb-4">BFS Algorithm Steps</h4>
-             <div className="max-h-64 overflow-y-auto space-y-2 thin-scrollbar">
-               {bfsSteps.map((step, index) => (
-                 <div 
-                   key={index} 
-                   className={`p-3 rounded-lg border cursor-pointer transition-all duration-200 ${
-                     index === currentBfsStep 
-                       ? 'bg-blue-100 border-blue-300 text-blue-800' 
-                       : index < currentBfsStep
-                       ? 'bg-green-50 border-green-200 text-green-800'
-                       : 'bg-slate-800 border-slate-700 text-slate-400'
-                   }`}
-                   onClick={() => goToStep(index)}
-                 >
-                   <div className="flex items-start gap-3">
-                     <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                       index === currentBfsStep 
-                         ? 'bg-blue-500 text-white' 
-                         : index < currentBfsStep
-                         ? 'bg-green-500 text-white'
-                         : 'bg-gray-300 text-gray-600'
-                     }`}>
-                       {index}
-                     </div>
-                     <div className="flex-1">
-                       <div className="text-sm font-medium">{step.action.toUpperCase()}</div>
-                       <div className="text-xs mt-1">{step.description}</div>
-                       {step.queue.length > 0 && (
-                         <div className="text-xs mt-2 bg-white px-2 py-1 rounded border">
-                           Queue: [{step.queue.join(', ')}]
-                         </div>
-                       )}
-                     </div>
-                   </div>
-                 </div>
-               ))}
-             </div>
-           </div>
-         )}
-
-         {/* Quick Guide */}
-         <div className="mt-8 bg-gradient-to-r from-slate-50 to-blue-50 rounded-xl p-4 border border-slate-200 shadow-sm">
-           <div className="flex items-center justify-between text-sm text-slate-600">
-             <span>🖱️ <strong>Drag</strong> nodes • <strong>Scroll</strong> to zoom • <strong>Drag background</strong> to pan</span>
-             <span>🎯 <strong>Build graph</strong> → <strong>Set path</strong> → <strong>Watch BFS</strong></span>
-           </div>
-         </div>
+          <aside className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
+            <StepExplanationPanel currentStep={currentStep} message={message} />
+            <QueuePanel queue={currentStep?.queue || []} />
+            <LevelsPanel currentStep={currentStep} />
+            <ParentPanel parent={currentStep?.parent} />
+            <LegendPanel />
+            <PseudocodePanel activeLine={currentStep?.pseudoLine} />
+          </aside>
+        </section>
       </div>
     </div>
-    </>
   );
 }
