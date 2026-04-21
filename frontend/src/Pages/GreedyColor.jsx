@@ -351,28 +351,39 @@ export default function GreedyColor() {
   // ---------- drag with boundary clamping ----------
   const svgRef = useRef(null);
   const dragRef = useRef({ id: null, ox: 0, oy: 0 });
+  const getSvgPoint = (event) => {
+    const svgRect = svgRef.current?.getBoundingClientRect();
+    if (!svgRect) return null;
+    const source = event.touches && event.touches[0]
+      ? event.touches[0]
+      : (event.changedTouches && event.changedTouches[0]) || event;
+    const scaleX = SVG_W / svgRect.width;
+    const scaleY = SVG_H / svgRect.height;
+    return {
+      x: (source.clientX - svgRect.left) * scaleX,
+      y: (source.clientY - svgRect.top) * scaleY,
+    };
+  };
   const onNodeDown = (e, id) => {
     e.preventDefault();
-    const svg = svgRef.current;
-    if (!svg) return;
-    const r = svg.getBoundingClientRect();
+    const pt = getSvgPoint(e);
+    if (!pt) return;
     const n = nodes.find((n) => n.id === id);
     if (!n) return;
-    const sx = ((e.clientX - r.left) / r.width) * SVG_W;
-    const sy = ((e.clientY - r.top) / r.height) * SVG_H;
-    dragRef.current = { id, ox: sx - n.x, oy: sy - n.y };
+    dragRef.current = { id, ox: pt.x - n.x, oy: pt.y - n.y };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
+    window.addEventListener("touchmove", onMove, { passive: false });
+    window.addEventListener("touchend", onUp);
+    window.addEventListener("touchcancel", onUp);
   };
   const onMove = (e) => {
     if (dragRef.current.id === null) return;
-    const svg = svgRef.current;
-    if (!svg) return;
-    const r = svg.getBoundingClientRect();
-    const sx = ((e.clientX - r.left) / r.width) * SVG_W;
-    const sy = ((e.clientY - r.top) / r.height) * SVG_H;
-    const x = Math.max(NODE_R, Math.min(SVG_W - NODE_R, sx - dragRef.current.ox));
-    const y = Math.max(NODE_R, Math.min(SVG_H - NODE_R, sy - dragRef.current.oy));
+    if (e.touches) e.preventDefault();
+    const pt = getSvgPoint(e);
+    if (!pt) return;
+    const x = Math.max(NODE_R, Math.min(SVG_W - NODE_R, pt.x - dragRef.current.ox));
+    const y = Math.max(NODE_R, Math.min(SVG_H - NODE_R, pt.y - dragRef.current.oy));
     const id = dragRef.current.id;
     setNodes((ns) => ns.map((n) => (n.id === id ? { ...n, x, y } : n)));
   };
@@ -380,10 +391,16 @@ export default function GreedyColor() {
     dragRef.current = { id: null, ox: 0, oy: 0 };
     window.removeEventListener("mousemove", onMove);
     window.removeEventListener("mouseup", onUp);
+    window.removeEventListener("touchmove", onMove);
+    window.removeEventListener("touchend", onUp);
+    window.removeEventListener("touchcancel", onUp);
   };
   useEffect(() => () => {
     window.removeEventListener("mousemove", onMove);
     window.removeEventListener("mouseup", onUp);
+    window.removeEventListener("touchmove", onMove);
+    window.removeEventListener("touchend", onUp);
+    window.removeEventListener("touchcancel", onUp);
     // eslint-disable-next-line
   }, []);
 
@@ -917,7 +934,8 @@ export default function GreedyColor() {
                 ref={svgRef}
                 width="100%"
                 viewBox={`0 0 ${SVG_W} ${SVG_H}`}
-                className="bg-slate-800 rounded"
+                preserveAspectRatio="xMidYMid meet"
+                className="bg-slate-800 rounded touch-none select-none"
               >
                 {/* edges */}
                 {edges.map((e, i) => {
@@ -950,7 +968,7 @@ export default function GreedyColor() {
                   const fill =
                     c > 0 ? PALETTE[(c - 1) % PALETTE.length] : "#cbd5e1";
                   return (
-                    <g key={n.id} onMouseDown={(e) => onNodeDown(e, n.id)} style={{ cursor: "grab" }}>
+                    <g key={n.id} onMouseDown={(e) => onNodeDown(e, n.id)} onTouchStart={(e) => onNodeDown(e, n.id)} style={{ cursor: "grab", touchAction: "none" }}>
                       <circle
                         cx={n.x}
                         cy={n.y}

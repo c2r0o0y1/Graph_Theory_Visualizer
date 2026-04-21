@@ -203,7 +203,7 @@ function fourColorWithSteps(nodes, edges) {
 
 const NodeDot = memo(function NodeDot({ n, fill, ring, onDown }) {
   return (
-    <g onMouseDown={(e) => onDown(e, n.id)} style={{ cursor: 'grab' }}>
+    <g onMouseDown={(e) => onDown(e, n.id)} onTouchStart={(e) => onDown(e, n.id)} style={{ cursor: 'grab', touchAction: 'none' }}>
       <circle cx={n.x} cy={n.y} r={NODE_R} fill={fill} stroke={ring || '#334155'} strokeWidth={ring ? 4 : 2} />
       <text x={n.x} y={n.y} textAnchor="middle" dy=".35em" fontSize={12} fontWeight="700"
             fill={fill === '#cbd5e1' ? '#0F172A' : '#fff'} className="select-none pointer-events-none">
@@ -232,23 +232,43 @@ export default function FourColor() {
   }, []);
 
   // --- drag with boundary clamping
+  const getSvgPoint = (event) => {
+    const svgRect = svgRef.current?.getBoundingClientRect();
+    if (!svgRect) return null;
+    const source = event.touches && event.touches[0]
+      ? event.touches[0]
+      : (event.changedTouches && event.changedTouches[0]) || event;
+    const scaleX = SVG_W / svgRect.width;
+    const scaleY = SVG_H / svgRect.height;
+    return {
+      x: (source.clientX - svgRect.left) * scaleX,
+      y: (source.clientY - svgRect.top) * scaleY,
+    };
+  };
   const onDown = (e, id) => {
     e.preventDefault();
-    const svg = svgRef.current; if (!svg) return;
-    const r = svg.getBoundingClientRect();
+    const pt = getSvgPoint(e);
+    if (!pt) return;
     const n = nodes.find((n) => n.id === id); if (!n) return;
-    const sx = ((e.clientX - r.left) / r.width) * SVG_W;
-    const sy = ((e.clientY - r.top) / r.height) * SVG_H;
-    dragRef.current = { id, ox: sx - n.x, oy: sy - n.y };
+    dragRef.current = { id, ox: pt.x - n.x, oy: pt.y - n.y };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
+    window.addEventListener('touchmove', onMove, { passive: false });
+    window.addEventListener('touchend', onUp);
+    window.addEventListener('touchcancel', onUp);
   };
   const onMove = useCallback((e) => {
     if (dragRef.current.id === null) return;
-    const svg = svgRef.current; if (!svg) return;
-    const r = svg.getBoundingClientRect();
-    const sx = ((e.clientX - r.left) / r.width) * SVG_W;
-    const sy = ((e.clientY - r.top) / r.height) * SVG_H;
+    if (e.touches) e.preventDefault();
+    const svgRect = svgRef.current?.getBoundingClientRect();
+    if (!svgRect) return;
+    const source = e.touches && e.touches[0]
+      ? e.touches[0]
+      : (e.changedTouches && e.changedTouches[0]) || e;
+    const scaleX = SVG_W / svgRect.width;
+    const scaleY = SVG_H / svgRect.height;
+    const sx = (source.clientX - svgRect.left) * scaleX;
+    const sy = (source.clientY - svgRect.top) * scaleY;
     const x = Math.max(NODE_R, Math.min(SVG_W - NODE_R, sx - dragRef.current.ox));
     const y = Math.max(NODE_R, Math.min(SVG_H - NODE_R, sy - dragRef.current.oy));
     const id = dragRef.current.id;
@@ -258,10 +278,16 @@ export default function FourColor() {
     dragRef.current = { id: null, ox: 0, oy: 0 };
     window.removeEventListener('mousemove', onMove);
     window.removeEventListener('mouseup', onUp);
+    window.removeEventListener('touchmove', onMove);
+    window.removeEventListener('touchend', onUp);
+    window.removeEventListener('touchcancel', onUp);
   }, [onMove]);
   useEffect(() => () => {
     window.removeEventListener('mousemove', onMove);
     window.removeEventListener('mouseup', onUp);
+    window.removeEventListener('touchmove', onMove);
+    window.removeEventListener('touchend', onUp);
+    window.removeEventListener('touchcancel', onUp);
   }, [onMove, onUp]);
 
   // --- graph editing
@@ -423,7 +449,8 @@ export default function FourColor() {
                 <div className="text-xs text-slate-400">Drag nodes freely • right-click to delete</div>
               </div>
               <svg ref={svgRef} viewBox={`0 0 ${SVG_W} ${SVG_H}`} width="100%"
-                   className="border border-slate-700 rounded-lg bg-slate-800">
+                   preserveAspectRatio="xMidYMid meet"
+                   className="border border-slate-700 rounded-lg bg-slate-800 touch-none select-none">
                 {edges.map((e) => {
                   const a = nodes.find((n) => n.id === e.from);
                   const b = nodes.find((n) => n.id === e.to);

@@ -569,21 +569,36 @@ export default function EdgeColor() {
 
   /* ------------------- Drag ------------------- */
 
+  const getSvgPoint = (event) => {
+    const svgRect = svgRef.current?.getBoundingClientRect();
+    if (!svgRect) return null;
+    const source = event.touches && event.touches[0]
+      ? event.touches[0]
+      : (event.changedTouches && event.changedTouches[0]) || event;
+    const scaleX = SVG_W / svgRect.width;
+    const scaleY = SVG_H / svgRect.height;
+    return {
+      x: (source.clientX - svgRect.left) * scaleX,
+      y: (source.clientY - svgRect.top) * scaleY,
+    };
+  };
+
   const onMouseDown = (e, id) => {
+    e.preventDefault();
     dragRef.current = { id };
   };
   const onMouseMove = (e) => {
-    if (!dragRef.current || !svgRef.current) return;
-    const rect = svgRef.current.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * SVG_W;
-    const y = ((e.clientY - rect.top) / rect.height) * SVG_H;
+    if (!dragRef.current) return;
+    if (e.touches) e.preventDefault();
+    const pt = getSvgPoint(e);
+    if (!pt) return;
     setNodes((ns) =>
       ns.map((n) =>
         n.id === dragRef.current.id
           ? {
               ...n,
-              x: Math.max(NODE_R, Math.min(SVG_W - NODE_R, x)),
-              y: Math.max(NODE_R, Math.min(SVG_H - NODE_R, y)),
+              x: Math.max(NODE_R, Math.min(SVG_W - NODE_R, pt.x)),
+              y: Math.max(NODE_R, Math.min(SVG_H - NODE_R, pt.y)),
             }
           : n
       )
@@ -954,12 +969,16 @@ export default function EdgeColor() {
               <svg
                 ref={svgRef}
                 viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+                preserveAspectRatio="xMidYMid meet"
                 width="100%"
                 height="500"
-                className="bg-slate-800 rounded-lg select-none"
+                className="bg-slate-800 rounded-lg touch-none select-none"
                 onMouseMove={onMouseMove}
                 onMouseUp={onMouseUp}
                 onMouseLeave={onMouseUp}
+                onTouchMove={onMouseMove}
+                onTouchEnd={onMouseUp}
+                onTouchCancel={onMouseUp}
               >
                 {/* Edges */}
                 {edges.map((e) => {
@@ -1004,7 +1023,8 @@ export default function EdgeColor() {
                   <g
                     key={n.id}
                     onMouseDown={(e) => onMouseDown(e, n.id)}
-                    style={{ cursor: "grab" }}
+                    onTouchStart={(e) => onMouseDown(e, n.id)}
+                    style={{ cursor: "grab", touchAction: "none" }}
                   >
                     <circle
                       cx={n.x}

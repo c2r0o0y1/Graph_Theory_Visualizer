@@ -596,16 +596,23 @@ export default function HSAlgo() {
   }, [hsPlaying, hsIdx, hsSteps.length, hsSpeed]);
 
   /* ─── SVG coord helpers ─── */
-  const screenToSVG = useCallback((el, cx, cy) => {
-    if (!el) return { x: 0, y: 0 };
+  const getSvgPoint = useCallback((event) => {
+    const el = svgRef.current;
+    if (!el) return null;
     const rect = el.getBoundingClientRect();
-    const mx = cx - rect.left, my = cy - rect.top;
-    const cX = rect.width / 2, cY = rect.height / 2;
+    const source = event.touches && event.touches[0]
+      ? event.touches[0]
+      : (event.changedTouches && event.changedTouches[0]) || event;
+    const scaleX = W / rect.width;
+    const scaleY = H / rect.height;
+    const mx = (source.clientX - rect.left) * scaleX;
+    const my = (source.clientY - rect.top) * scaleY;
+    const cX = W / 2, cY = H / 2;
     return {
       x: ((mx - pan.x) - cX) / zoom + cX,
       y: ((my - pan.y) - cY) / zoom + cY,
     };
-  }, [zoom, pan]);
+  }, [zoom, pan, W, H]);
 
   /* ─── interaction ─── */
   const onNodeClick = useCallback((id) => {
@@ -619,20 +626,26 @@ export default function HSAlgo() {
   const onMouseDownNode = (e, node) => {
     e.preventDefault(); e.stopPropagation();
     if (connectMode) { onNodeClick(node.id); return; }
-    const pt = screenToSVG(svgRef.current, e.clientX, e.clientY);
+    const pt = getSvgPoint(e);
+    if (!pt) return;
     setDragId(node.id);
     setDragOff({ x: pt.x - node.x, y: pt.y - node.y });
   };
 
   const onMouseMove = (e) => {
     if (dragId !== null) {
-      const pt = screenToSVG(svgRef.current, e.clientX, e.clientY);
+      if (e.touches) e.preventDefault();
+      const pt = getSvgPoint(e);
+      if (!pt) return;
       const nx = Math.max(20, Math.min(W - 20, pt.x - dragOff.x));
       const ny = Math.max(20, Math.min(H - 20, pt.y - dragOff.y));
       setNodes((prev) => prev.map((n) => (n.id === dragId ? { ...n, x: nx, y: ny } : n)));
     } else if (isPanning) {
-      setPan((p) => ({ x: p.x + e.clientX - panStart.x, y: p.y + e.clientY - panStart.y }));
-      setPanStart({ x: e.clientX, y: e.clientY });
+      const src = e.touches && e.touches[0]
+        ? e.touches[0]
+        : (e.changedTouches && e.changedTouches[0]) || e;
+      setPan((p) => ({ x: p.x + src.clientX - panStart.x, y: p.y + src.clientY - panStart.y }));
+      setPanStart({ x: src.clientX, y: src.clientY });
     }
   };
 
@@ -640,13 +653,17 @@ export default function HSAlgo() {
 
   const onSvgMouseDown = (e) => {
     if (e.target.closest('g')) return;
+    const src = e.touches && e.touches[0]
+      ? e.touches[0]
+      : (e.changedTouches && e.changedTouches[0]) || e;
     setIsPanning(true);
-    setPanStart({ x: e.clientX, y: e.clientY });
+    setPanStart({ x: src.clientX, y: src.clientY });
   };
 
   const onSvgDblClick = (e) => {
     if (e.target.closest('g')) return;
-    const pt = screenToSVG(svgRef.current, e.clientX, e.clientY);
+    const pt = getSvgPoint(e);
+    if (!pt) return;
     addNodeAt(pt.x, pt.y);
   };
 
@@ -849,10 +866,11 @@ export default function HSAlgo() {
 
               <div className="relative overflow-hidden rounded-xl border border-slate-700 bg-slate-800">
                 <svg ref={svgRef} width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet"
-                  className="block"
+                  className="block touch-none select-none"
                   style={{ transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`, transformOrigin: 'center', transition: dragId || isPanning ? 'none' : 'transform 0.15s ease-out', cursor: connectMode ? 'crosshair' : isPanning ? 'grabbing' : 'grab' }}
                   onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp}
-                  onMouseDown={onSvgMouseDown} onDoubleClick={onSvgDblClick} onWheel={onWheel}>
+                  onTouchMove={onMouseMove} onTouchEnd={onMouseUp} onTouchCancel={onMouseUp}
+                  onMouseDown={onSvgMouseDown} onTouchStart={onSvgMouseDown} onDoubleClick={onSvgDblClick} onWheel={onWheel}>
 
                   {/* edges */}
                   {dispEdges.map(({ a, b }) => {
@@ -886,8 +904,8 @@ export default function HSAlgo() {
                     else if (isProc) { ring = '#6366f1'; rw = 3; }
                     else if (isSrc) { ring = '#22c55e'; rw = 3; }
                     return (
-                      <g key={n.id} onMouseDown={(e) => onMouseDownNode(e, n)}
-                        style={{ cursor: connectMode ? 'pointer' : dragId === n.id ? 'grabbing' : 'grab' }}>
+                      <g key={n.id} onMouseDown={(e) => onMouseDownNode(e, n)} onTouchStart={(e) => onMouseDownNode(e, n)}
+                        style={{ cursor: connectMode ? 'pointer' : dragId === n.id ? 'grabbing' : 'grab', touchAction: 'none' }}>
                         {isMoved && <circle cx={n.x} cy={n.y} r={30} fill="none" stroke="#22c55e" strokeWidth={2} opacity={0.4} className="animate-pulse-slow" />}
                         <circle cx={n.x} cy={n.y} r={22} fill={getFill(n.id)} stroke={ring} strokeWidth={rw}
                           style={{ transition: 'fill 0.4s ease, stroke 0.3s, stroke-width 0.3s' }} />

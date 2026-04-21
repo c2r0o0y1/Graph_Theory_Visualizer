@@ -181,7 +181,8 @@ const NodeCircle = memo(function NodeCircle({
   return (
     <g
       onMouseDown={(e) => onMouseDown(e, node.id)}
-      style={{ cursor: "grab" }}
+      onTouchStart={(e) => onMouseDown(e, node.id)}
+      style={{ cursor: "grab", touchAction: "none" }}
     >
       {(dVal !== undefined || fVal !== undefined) && (
         <text
@@ -402,28 +403,45 @@ export default function DFS() {
   };
 
   // ---------- Drag ----------
+  const getSvgPoint = (event) => {
+    const svgRect = svgRef.current?.getBoundingClientRect();
+    if (!svgRect) return null;
+    const source = event.touches && event.touches[0]
+      ? event.touches[0]
+      : (event.changedTouches && event.changedTouches[0]) || event;
+    const scaleX = CANVAS_W / svgRect.width;
+    const scaleY = CANVAS_H / svgRect.height;
+    return {
+      x: (source.clientX - svgRect.left) * scaleX,
+      y: (source.clientY - svgRect.top) * scaleY,
+    };
+  };
+
   const onNodeMouseDown = (e, id) => {
     e.preventDefault();
-    const svg = svgRef.current;
-    if (!svg) return;
-    const pt = svg.getBoundingClientRect();
+    const pt = getSvgPoint(e);
+    if (!pt) return;
     const node = nodes.find((n) => n.id === id);
+    if (!node) return;
     dragRef.current = {
       id,
-      offsetX: e.clientX - pt.left - node.x,
-      offsetY: e.clientY - pt.top - node.y,
+      offsetX: pt.x - node.x,
+      offsetY: pt.y - node.y,
     };
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("mouseup", onMouseUp);
+    window.addEventListener("touchmove", onMouseMove, { passive: false });
+    window.addEventListener("touchend", onMouseUp);
+    window.addEventListener("touchcancel", onMouseUp);
   };
 
   const onMouseMove = (e) => {
     if (dragRef.current.id === null) return;
-    const svg = svgRef.current;
-    if (!svg) return;
-    const pt = svg.getBoundingClientRect();
-    const x = Math.max(NODE_R, Math.min(CANVAS_W - NODE_R, e.clientX - pt.left - dragRef.current.offsetX));
-    const y = Math.max(NODE_R, Math.min(CANVAS_H - NODE_R, e.clientY - pt.top - dragRef.current.offsetY));
+    if (e.touches) e.preventDefault();
+    const pt = getSvgPoint(e);
+    if (!pt) return;
+    const x = Math.max(NODE_R, Math.min(CANVAS_W - NODE_R, pt.x - dragRef.current.offsetX));
+    const y = Math.max(NODE_R, Math.min(CANVAS_H - NODE_R, pt.y - dragRef.current.offsetY));
     const id = dragRef.current.id;
     setNodes((ns) => ns.map((n) => (n.id === id ? { ...n, x, y } : n)));
   };
@@ -432,12 +450,18 @@ export default function DFS() {
     dragRef.current = { id: null, offsetX: 0, offsetY: 0 };
     window.removeEventListener("mousemove", onMouseMove);
     window.removeEventListener("mouseup", onMouseUp);
+    window.removeEventListener("touchmove", onMouseMove);
+    window.removeEventListener("touchend", onMouseUp);
+    window.removeEventListener("touchcancel", onMouseUp);
   };
 
   useEffect(() => {
     return () => {
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
+      window.removeEventListener("touchmove", onMouseMove);
+      window.removeEventListener("touchend", onMouseUp);
+      window.removeEventListener("touchcancel", onMouseUp);
     };
     // eslint-disable-next-line
   }, []);
@@ -724,7 +748,7 @@ export default function DFS() {
                 width="100%"
                 preserveAspectRatio="xMidYMid meet"
                 viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}
-                className="w-full border border-slate-700 rounded-lg bg-slate-800"
+                className="w-full border border-slate-700 rounded-lg bg-slate-800 touch-none select-none"
               >
                 {directed && (
                   <defs>

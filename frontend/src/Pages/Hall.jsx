@@ -300,6 +300,7 @@ const NodeCircle = memo(function NodeCircle({
   node,
   side,
   onMouseDown,
+  onTouchStart,
   highlighted,
   currentA,
   inPath,
@@ -316,7 +317,8 @@ const NodeCircle = memo(function NodeCircle({
   return (
     <g
       onMouseDown={onMouseDown}
-      style={{ cursor: "ns-resize" }}
+      onTouchStart={onTouchStart}
+      style={{ cursor: "ns-resize", touchAction: "none" }}
     >
       <circle
         cx={node.x}
@@ -526,25 +528,36 @@ export default function Hall() {
   }
 
   // ---------------- Drag (vertical only) ----------------
+  const SVG_W_HALL = 800;
+  const SVG_H_HALL = 500;
+  function getHallSvgPoint(event) {
+    const svg = document.getElementById("hall-svg");
+    if (!svg) return null;
+    const rect = svg.getBoundingClientRect();
+    const source = event.touches && event.touches[0]
+      ? event.touches[0]
+      : (event.changedTouches && event.changedTouches[0]) || event;
+    const scaleX = SVG_W_HALL / rect.width;
+    const scaleY = SVG_H_HALL / rect.height;
+    return {
+      x: (source.clientX - rect.left) * scaleX,
+      y: (source.clientY - rect.top) * scaleY,
+    };
+  }
   function onNodeMouseDown(e, nodeId) {
-    const svg = e.currentTarget.ownerSVGElement;
-    const pt = svg.createSVGPoint();
-    pt.x = e.clientX;
-    pt.y = e.clientY;
-    const ctm = svg.getScreenCTM().inverse();
-    const loc = pt.matrixTransform(ctm);
+    e.preventDefault();
+    const loc = getHallSvgPoint(e);
+    if (!loc) return;
     const base = allNodes.find((n) => n.id === nodeId);
+    if (!base) return;
     dragRef.current = { id: nodeId, startMouseY: loc.y, startNodeY: base.y };
   }
   useEffect(() => {
     function move(e) {
       if (!dragRef.current) return;
-      const svg = document.getElementById("hall-svg");
-      if (!svg) return;
-      const pt = svg.createSVGPoint();
-      pt.x = e.clientX;
-      pt.y = e.clientY;
-      const loc = pt.matrixTransform(svg.getScreenCTM().inverse());
+      if (e.touches) e.preventDefault();
+      const loc = getHallSvgPoint(e);
+      if (!loc) return;
       const { id, startMouseY, startNodeY } = dragRef.current;
       const dy = loc.y - startMouseY;
       const newY = Math.max(40, Math.min(460, startNodeY + dy));
@@ -561,9 +574,15 @@ export default function Hall() {
     }
     window.addEventListener("mousemove", move);
     window.addEventListener("mouseup", up);
+    window.addEventListener("touchmove", move, { passive: false });
+    window.addEventListener("touchend", up);
+    window.addEventListener("touchcancel", up);
     return () => {
       window.removeEventListener("mousemove", move);
       window.removeEventListener("mouseup", up);
+      window.removeEventListener("touchmove", move);
+      window.removeEventListener("touchend", up);
+      window.removeEventListener("touchcancel", up);
     };
   }, [nodesA, nodesB]);
 
@@ -890,7 +909,8 @@ export default function Hall() {
               <svg
                 id="hall-svg"
                 viewBox="0 0 800 500"
-                className="w-full h-[500px] bg-slate-800 rounded-lg"
+                preserveAspectRatio="xMidYMid meet"
+                className="w-full h-[500px] bg-slate-800 rounded-lg touch-none select-none"
               >
                 {/* column labels */}
                 <text
@@ -976,6 +996,7 @@ export default function Hall() {
                     node={n}
                     side="A"
                     onMouseDown={(e) => onNodeMouseDown(e, n.id)}
+                    onTouchStart={(e) => onNodeMouseDown(e, n.id)}
                     highlighted={pathNodeSet.has(n.id)}
                     currentA={current.currentA === n.id}
                     inPath={pathNodeSet.has(n.id)}
@@ -989,6 +1010,7 @@ export default function Hall() {
                     node={n}
                     side="B"
                     onMouseDown={(e) => onNodeMouseDown(e, n.id)}
+                    onTouchStart={(e) => onNodeMouseDown(e, n.id)}
                     highlighted={pathNodeSet.has(n.id)}
                     currentA={false}
                     inPath={pathNodeSet.has(n.id)}

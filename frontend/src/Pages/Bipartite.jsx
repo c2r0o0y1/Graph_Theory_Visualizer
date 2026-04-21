@@ -217,7 +217,8 @@ const NodeCircle = memo(function NodeCircle({
     <g
       transform={`translate(${node.x},${node.y})`}
       onMouseDown={(e) => onMouseDown(e, node.id)}
-      style={{ cursor: "grab" }}
+      onTouchStart={(e) => onMouseDown(e, node.id)}
+      style={{ cursor: "grab", touchAction: "none" }}
     >
       {isCurrent && (
         <circle r={R + 6} fill="none" stroke={COLOR_AMBER} strokeWidth={3} />
@@ -502,25 +503,37 @@ export default function Bipartite() {
   };
 
   // ---------- drag ----------
+  const getSvgPoint = (event) => {
+    const svgRect = svgRef.current?.getBoundingClientRect();
+    if (!svgRect) return null;
+    const source = event.touches && event.touches[0]
+      ? event.touches[0]
+      : (event.changedTouches && event.changedTouches[0]) || event;
+    const scaleX = SVG_W / svgRect.width;
+    const scaleY = SVG_H / svgRect.height;
+    return {
+      x: (source.clientX - svgRect.left) * scaleX,
+      y: (source.clientY - svgRect.top) * scaleY,
+    };
+  };
+
   const onMouseDown = (e, id) => {
-    const svg = svgRef.current;
-    const pt = svg.createSVGPoint();
-    pt.x = e.clientX;
-    pt.y = e.clientY;
-    const p = pt.matrixTransform(svg.getScreenCTM().inverse());
+    e.preventDefault();
+    const p = getSvgPoint(e);
+    if (!p) return;
     drag.current = { id, dx: 0, dy: 0, startX: p.x, startY: p.y };
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("mouseup", onMouseUp);
+    window.addEventListener("touchmove", onMouseMove, { passive: false });
+    window.addEventListener("touchend", onMouseUp);
+    window.addEventListener("touchcancel", onMouseUp);
   };
 
   const onMouseMove = (e) => {
     if (!drag.current) return;
-    const svg = svgRef.current;
-    if (!svg) return;
-    const pt = svg.createSVGPoint();
-    pt.x = e.clientX;
-    pt.y = e.clientY;
-    const p = pt.matrixTransform(svg.getScreenCTM().inverse());
+    if (e.touches) e.preventDefault();
+    const p = getSvgPoint(e);
+    if (!p) return;
     const id = drag.current.id;
     setNodesPositional(id, p.x, p.y);
   };
@@ -529,6 +542,9 @@ export default function Bipartite() {
     drag.current = null;
     window.removeEventListener("mousemove", onMouseMove);
     window.removeEventListener("mouseup", onMouseUp);
+    window.removeEventListener("touchmove", onMouseMove);
+    window.removeEventListener("touchend", onMouseUp);
+    window.removeEventListener("touchcancel", onMouseUp);
   };
 
   const liveNodesRef = useRef(nodes);
@@ -915,7 +931,8 @@ export default function Bipartite() {
               <svg
                 ref={svgRef}
                 viewBox={`0 0 ${SVG_W} ${SVG_H}`}
-                className="w-full h-auto bg-slate-800 rounded-lg"
+                preserveAspectRatio="xMidYMid meet"
+                className="w-full h-auto bg-slate-800 rounded-lg touch-none select-none"
                 style={{ userSelect: "none" }}
               >
                 {/* partition columns guide */}

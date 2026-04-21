@@ -864,34 +864,44 @@ export default function BFS() {
     if (steps[0]) setMessage(steps[0].narration);
   };
 
+  // Convert a pointer/touch/mouse event into SVG-space coordinates
+  // (accounts for CSS scaling of the SVG vs. its viewBox intrinsic size).
+  const getSvgPoint = (event) => {
+    const svgRect = svgRef.current?.getBoundingClientRect();
+    if (!svgRect) return null;
+    const source = event.touches && event.touches[0]
+      ? event.touches[0]
+      : (event.changedTouches && event.changedTouches[0]) || event;
+    const scaleX = SVG_WIDTH / svgRect.width;
+    const scaleY = SVG_HEIGHT / svgRect.height;
+    return {
+      x: (source.clientX - svgRect.left) * scaleX,
+      y: (source.clientY - svgRect.top) * scaleY,
+    };
+  };
+
   const handleNodeMouseDown = (event, nodeId) => {
     event.preventDefault();
     event.stopPropagation();
 
-    const svgRect = svgRef.current?.getBoundingClientRect();
-    if (!svgRect) return;
-
     const node = nodeMap[nodeId];
-    if (!node) return;
-
-    const mouseX = event.clientX - svgRect.left;
-    const mouseY = event.clientY - svgRect.top;
+    const pt = getSvgPoint(event);
+    if (!node || !pt) return;
 
     setDraggingId(nodeId);
-    setDragOffset({ x: mouseX - node.x, y: mouseY - node.y });
+    setDragOffset({ x: pt.x - node.x, y: pt.y - node.y });
   };
 
   const handleMouseMove = (event) => {
     if (!draggingId) return;
+    // Block scroll/zoom while dragging on touch devices.
+    if (event.touches) event.preventDefault();
 
-    const svgRect = svgRef.current?.getBoundingClientRect();
-    if (!svgRect) return;
+    const pt = getSvgPoint(event);
+    if (!pt) return;
 
-    const mouseX = event.clientX - svgRect.left;
-    const mouseY = event.clientY - svgRect.top;
-
-    const x = Math.max(NODE_RADIUS, Math.min(SVG_WIDTH - NODE_RADIUS, mouseX - dragOffset.x));
-    const y = Math.max(NODE_RADIUS, Math.min(SVG_HEIGHT - NODE_RADIUS, mouseY - dragOffset.y));
+    const x = Math.max(NODE_RADIUS, Math.min(SVG_WIDTH - NODE_RADIUS, pt.x - dragOffset.x));
+    const y = Math.max(NODE_RADIUS, Math.min(SVG_HEIGHT - NODE_RADIUS, pt.y - dragOffset.y));
 
     setNodes((prev) => prev.map((n) => (n.id === draggingId ? { ...n, x, y } : n)));
   };
@@ -1175,10 +1185,14 @@ export default function BFS() {
                 width={SVG_WIDTH}
                 height={SVG_HEIGHT}
                 viewBox={`0 0 ${SVG_WIDTH} ${SVG_HEIGHT}`}
-                className="h-auto w-full"
+                preserveAspectRatio="xMidYMid meet"
+                className="h-auto w-full touch-none select-none"
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
                 onMouseLeave={handleMouseUp}
+                onTouchMove={handleMouseMove}
+                onTouchEnd={handleMouseUp}
+                onTouchCancel={handleMouseUp}
               >
                 {edges.map((edge) => {
                   const n1 = nodeMap[edge.from];
@@ -1240,7 +1254,12 @@ export default function BFS() {
                   }
 
                   return (
-                    <g key={node.id} onMouseDown={(e) => handleNodeMouseDown(e, node.id)} style={{ cursor: 'grab' }}>
+                    <g
+                      key={node.id}
+                      onMouseDown={(e) => handleNodeMouseDown(e, node.id)}
+                      onTouchStart={(e) => handleNodeMouseDown(e, node.id)}
+                      style={{ cursor: 'grab', touchAction: 'none' }}
+                    >
                       {isCurrentLevel && !inPath && (
                         <circle cx={node.x} cy={node.y} r={NODE_RADIUS + 9} fill="none" stroke="#0ea5e9" strokeWidth={2} opacity={0.55} />
                       )}
