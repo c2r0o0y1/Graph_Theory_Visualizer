@@ -139,3 +139,25 @@ Open <http://localhost:3000> and navigate to `/hs-algo`.
 - `npm start` — dev server with hot reload
 - `npm test` — Jest test runner
 - `npm run build` — production build
+
+## Notes / To-Do's:
+Superficial To Do's:
+On H-S Page:
+-Include a link to the K-K paper.
+-Say what Delta(G) means.
+-Say (in the "Parameters" box) r = Delta and k = *r + 1* = 4 (or whatever number r + 1 is in the current context).
+-Replace "conflict" with "improper edge."
+-Make "Color Classes" as a horizontal/banner box so that the "Auxiliary Digraph" box can be directly next to the "Graph G" box.
+-"Light mode" option?
+
+Feature To Do's:
+-"Select multiple vertices" feature?
+-"Save/Download/Load Graph" feature?
+-Include the "New Random Graph" button on the H-S page (and all the other applicable pages).
+-Canvas is still limited
+-"Double-click to add vertex" seems glitchy.
+-Fix "scroll to zoom" feature -- scrolling currently both zooms *and* scrolls.
+-Design a "Draw As Planar As Possible" feature.
+
+Algorithm To Do's:
+-Doesn't seem to work on "Paper Graph" (Let's call it "Sample Graph 1")
